@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            .prg {
+                display:none;
+            }
+        </style>
+    </head>
+    <body>
+        <p id="output"></p>
+        <span class="prg">\ x . a</span>
+        <script src="stack.js"></script>
+        <script src="lcalc.js"></script>
+        <script>
+            var prgs = document.getElementsByClassName("prg");
+            var llang = new LambdaLang();
+            var printfn = function(){
+                var elm = document.getElementById("output");
+                elm.style.fontFamily = "monospace";
+                elm.style.fontSize = "12pt";
+                elm.style.whiteSpace = "pre";
+                return function(line){
+                    elm.innerHTML += line + "\n";
+                    };
+                }()
+            llang.eval(prgs[0].innerHTML);
+        </script>
+    </body>
+</html>

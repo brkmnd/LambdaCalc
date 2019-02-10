@@ -1,0 +1,28 @@
+# Grammar for untyped lambda calculus
+# This is done according to the book "Types and Programming Languages"
+# by B. C. Pierce
+
+token       "eq"    ,"lambda"   ,"dot"
+    as      "="     ,"\\\\"     ,"."
+token       "lpar"  ,"rpar"     ,"scolon"
+    as      "("     ,")"        ,";"
+token       "let"
+    as      "let"
+token -cap  "var"
+    as      "[a-z]+"
+!token      " "
+
+
+# Productions
+prod Stmt   -> Def "scolon" Stmt
+             | Term0
+# Definintions are done first thing in the program
+prod Def     -> "let" "var" "eq" Term0
+# Both associativity and precedence are directly done in grammar
+# Hence the numbering of the terms, 0,1,2 for low,mid,hight prec, resp.
+prod Term0  -> "lambda" "var" "dot" Term0
+             | Term1
+prod Term1  -> Term1 Term2
+             | Term2
+prod Term2  -> "var"
+             | "lpar" Term0 "rpar"
