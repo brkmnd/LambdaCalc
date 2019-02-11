@@ -8,12 +8,18 @@
         </style>
     </head>
     <body>
+        <p id="output0"></p>
         <p id="output"></p>
-        <span class="prg">\ x . a</span>
+        <span class="prg">
+    //let a = (\ x . \ y . \ z . a b c) b;
+    //let b = c;
+    (\ x . \ y . \ z . a b c) d e f
+        </span>
         <script src="stack.js"></script>
         <script src="lcalc.js"></script>
         <script>
             var prgs = document.getElementsByClassName("prg");
+            var prg = prgs[0];
             var llang = new LambdaLang();
             var printfn = function(){
                 var elm = document.getElementById("output");
@@ -23,8 +29,20 @@
                 return function(line){
                     elm.innerHTML += line + "\n";
                     };
-                }()
-            llang.eval(prgs[0].innerHTML);
+                }();
+            var printCode = function(){
+                var texta = document.getElementById("output0");
+                texta.style.backgroundColor = "black";
+                texta.style.color = "white";
+                texta.style.fontFamily = "monospace";
+                texta.style.fontSize = "12pt";
+                texta.style.whiteSpace = "pre";
+                texta.innerHTML = prg.innerHTML;
+                }();
+            llang.printTree(printfn,prg.innerHTML);
+            printfn("---------------------------------------");
+            printfn("---------------------------------------");
+            llang.evalCallByVal(printfn,prg.innerHTML);
         </script>
     </body>
 </html>
