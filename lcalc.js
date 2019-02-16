@@ -57,7 +57,13 @@ var LambdaLang = function(){
         //[0] __ -> Stmt 
         0:function(tree){ return tree; },
         //[1] Stmt -> Term0 
-        1:function(tree){ return tree; },
+        1:function(tree){
+            var term = tree.pop();
+            var stmts = tree.pop();
+            stmts.args.push(term);
+            tree.push(stmts);
+            return tree;
+            },
         //[2] Stmt -> Def scolon Stmt 
         2:function(tree){
             return tree;
@@ -66,9 +72,9 @@ var LambdaLang = function(){
         3:function(tree){
             var term = tree.pop();
             var id = tree.pop();
-            var scope = tree.pop();
-            scope.v[id.v] = term;
-            tree.push(scope);
+            var stmts = tree.pop();
+            stmts.args.push({type:"binding",id:id.v,term:term});
+            tree.push(stmts);
             return tree;
             },
         //[4] Term0 -> Term1 
@@ -564,7 +570,7 @@ var LambdaLang = function(){
             return tree;
             }
         sStack.push(0);
-        tree.push({type:"scope",v:{}});
+        tree.push({type:"stmts",args:[]});
         while(parsing){
             var s = sStack.peek();
             var a = tokens[i].tt;
@@ -605,16 +611,13 @@ var LambdaLang = function(){
         var lexed = lexer(input);
         var parsed = parser(lexed);
         var t = parsed.pop();
-        var scope0 = parsed.pop();
-        var scope = {};
         if(t.error){
-            return {error:true,msg:t.msg,tree:null,scope:null};
+            return {error:true,msg:t.msg,stmts:null};
             }
         if(parsed.count() > 0){
             alert("not empty absyn-stack");
             }
-        scope[0] = scope0.v;
-        return {error:false,msg:"",tree:t,scope:scope};
+        return {error:false,msg:"",stmts:t};
         };
     var printSpaces = function(n){
         var retval = "";
@@ -707,13 +710,14 @@ var LambdaLang = function(){
     var isAbstr = function(v){
         return v.type === "abstraction";
         };
-    var evalCallByVal = function(outf,t0,scope){
+    var evalCallByVal = function(outf,stmts){
         // Strict eval of arguments
         // Reduce from out to in only as long
         // as outer functions can be reduced
         var apps = new Stack();
-        //bind values first that are bound with let
-        var exec = function(depth,t){
+        var exec = function(depth,scope,t){
+            // after further recursion returns
+            // clear scope-level
             switch(t.type){
                 case "var":
                     var findDepth = scopeSearchUp(scope,depth,t.v);
@@ -722,7 +726,7 @@ var LambdaLang = function(){
                         }
                     var v = scope[findDepth][t.v];
                     if(isAbstr(v)){
-                        return exec(depth+1,v);
+                        return exec(depth+1,scope,v);
                         }
                     return v;
                 case "abstraction":
@@ -731,16 +735,28 @@ var LambdaLang = function(){
                         return t;
                         }
                     scopePush(scope,depth,t.binder.v,topArg);
-                    return exec(depth+1,t.body);
+                    return exec(depth+1,scope,t.body);
                 case "apply":
-                    var reducedArg = exec(depth+1,t.arg);
+                    var reducedArg = exec(depth+1,scope,t.arg);
                     apps.push(reducedArg);
-                    return exec(depth+1,t.fun);
+                    return exec(depth+1,scope,t.fun);
                 }
             };
-        var evaled  = exec(0,t0);
-        var evaled0 = treeAppendApps(apps,evaled);
-        outf(tree2str(evaled0));
+        // loop statements
+        var scope = {0:{}};
+        for(var i = 0; i < stmts.length; i++){
+            var stmt = stmts[i];
+            if(stmt.type === "binding"){
+                // Since call-by-val eval all bindings
+                // before pasted into scope
+                var term = exec(0,scope,stmt.term);
+                scope[0][stmt.id] = term;
+                continue;
+                }
+            var evaled  = exec(0,scope,stmt);
+            var evaledCleanArgs = treeAppendApps(apps,evaled);
+            outf(tree2str(evaledCleanArgs));
+            }
         };
     return {
         evalCallByVal:function(outf,input){
@@ -749,7 +765,7 @@ var LambdaLang = function(){
                 outf(tree.msg);
                 return false;
                 }
-            evalCallByVal(outf,tree.tree,tree.scope);
+            evalCallByVal(outf,tree.stmts.args);
             return true;
             },
         printTree:function(outf,input){
@@ -758,7 +774,7 @@ var LambdaLang = function(){
                 outf(tree.msg);
                 return false;
                 }
-            printTree(outf,tree.tree);
+            printTree(outf,tree.stmts);
             return true;
             }
         };
