@@ -13,7 +13,9 @@
         <span class="prg">
     //let a = (\ x . \ y . \ z . a b c) b;
     //let b = c;
-    (\ x . \ y . \ z . a b c) d e f
+    //(\ x . \ y . \ z . a z x) d e f
+    let a = \ x . \ y . x;
+    a one two
         </span>
         <script src="stack.js"></script>
         <script src="lcalc.js"></script>
