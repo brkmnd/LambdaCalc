@@ -1,4 +1,4 @@
-var LambdaLang = function(){
+var LambdaLang = function(outf){
     var actionType = {
         shift:function(d){
             return {type:"shift",v:d};
@@ -626,14 +626,14 @@ var LambdaLang = function(){
             }
         return retval;
         };
-    var printLexed = function(outf,l){
+    var printLexed = function(l){
         var i = 0;
         while(l[i] !== undefined){
             outf(l[i].tt);
             i++;
             }
         };
-    var printTree = function(outf,t0){
+    var printTree = function(t0){
         var exec = function(depth,t){
             switch(t.type){
                 case "var":
@@ -691,12 +691,27 @@ var LambdaLang = function(){
             }
         return -1;
         };
-    var scopePush = function(scope,depth,id,v){
+    var scopeSubFirst = function(scope,depth,v){
+        if(!isVar(v)){
+            return v;
+            }
+        while(depth >= 0){
+            if(scope[depth] !== undefined && scope[depth][v.v] !== undefined){
+                return scope[depth][v.v];
+                }
+            depth--;
+            }
+        return v;
+        };
+    var scopeAdd = function(scope,depth,id,v){
         if(scope[depth] === undefined){
             scope[depth] = {};
             }
         scope[depth][id] = v;
         return true;
+        };
+    var scopeCopy = function(s){
+        return JSON.parse(JSON.stringify(s));
         };
     var treeAppendApps = function(apps,tree){
         // append those apps that are still
@@ -710,71 +725,128 @@ var LambdaLang = function(){
     var isAbstr = function(v){
         return v.type === "abstraction";
         };
-    var evalCallByVal = function(outf,stmts){
+    var isApp = function(v){
+        return v.type === "apply";
+        };
+    var isVar = function(v){
+        return v.type === "var";
+        };
+    var evalWithStrats = function(stmts){
         // Strict eval of arguments
         // Reduce from out to in only as long
         // as outer functions can be reduced
-        var apps = new Stack();
-        var exec = function(depth,scope,t){
-            // after further recursion returns
-            // clear scope-level
+        var strat = {
+            stratVal:"by-val",
+            setByValue:function(){
+                this.stratVal = "by-val";
+                },
+            setByName:function(){
+                this.stratVal = "by-name";
+                },
+            isCallByValue:function(){
+                return this.stratVal !== "by-name";
+                },
+            isCallByName:function(){
+                return this.stratVal === "by-name";
+                }
+            };
+        var exec = function(depth,scope,apps,t){
+            // After further recursion returns in abstractions,
+            // clear level scope
             switch(t.type){
                 case "var":
-                    var findDepth = scopeSearchUp(scope,depth,t.v);
-                    if(findDepth === -1){
-                        return t;
-                        }
-                    var v = scope[findDepth][t.v];
+                    var v = scopeSubFirst(scope,depth,t);
                     if(isAbstr(v)){
-                        return exec(depth+1,scope,v);
+                        return exec(depth+1,v.closure,apps,v);
                         }
                     return v;
                 case "abstraction":
                     var topArg = apps.pop();
                     if(topArg === null){
+                        scope[depth] = {};
                         return t;
                         }
-                    scopePush(scope,depth,t.binder.v,topArg);
-                    return exec(depth+1,scope,t.body);
+                    if(isAbstr(topArg)){
+                        topArg.closure = scopeCopy(scope);
+                        }
+                    scopeAdd(scope,depth,t.binder.v,topArg);
+                    var retval = exec(depth+1,scope,apps,t.body);
+                    scope[depth] = {};
+                    return retval;
                 case "apply":
-                    var reducedArg = exec(depth+1,scope,t.arg);
-                    apps.push(reducedArg);
-                    return exec(depth+1,scope,t.fun);
+                    // Eval arg with new stack to avoid mix up
+                    var arg = function(){
+                        if(strat.isCallByValue()){
+                            var apps0 = new Stack();
+                            var retval = exec(depth+1,scope,apps0,t.arg);
+                            return treeAppendApps(apps0,retval);
+                            }
+                        return t.arg;
+                        }();
+                    //apps.push(treeAppendApps(apps0,arg));
+                    apps.push(arg);
+                    return exec(depth+1,scope,apps,t.fun);
                 }
             };
-        // loop statements
-        var scope = {0:{}};
-        for(var i = 0; i < stmts.length; i++){
-            var stmt = stmts[i];
-            if(stmt.type === "binding"){
-                // Since call-by-val eval all bindings
-                // before pasted into scope
-                var term = exec(0,scope,stmt.term);
-                scope[0][stmt.id] = term;
-                continue;
+        var startEval = function(){
+            // Loop through statements
+            var scope = {0:{}};
+            for(var i = 0; i < stmts.length; i++){
+                var stmt = stmts[i];
+                if(stmt.type === "binding"){
+                    // Since call-by-val: eval all bindings
+                    // before pasted into scope
+                    var apps = new Stack();
+                    var term = exec(1,scope,apps,stmt.term);
+                    if(isAbstr(term)){
+                        term.closure = scopeCopy(scope);
+                        }
+                    scope[0][stmt.id] = treeAppendApps(apps,term);
+                    continue;
+                    }
+                var apps = new Stack();
+                var evaled  = exec(0,scope,apps,stmt);
+                var evaledWithArgs = treeAppendApps(apps,evaled);
+                outf(tree2str(evaledWithArgs));
                 }
-            var evaled  = exec(0,scope,stmt);
-            var evaledCleanArgs = treeAppendApps(apps,evaled);
-            outf(tree2str(evaledCleanArgs));
-            }
+            };
+        return {
+            callByValue:function(){
+                strat.setByValue();
+                startEval();
+                },
+            callByName:function(){
+                strat.setByName();
+                startEval();
+                }
+            };
         };
     return {
-        evalCallByVal:function(outf,input){
+        evalCallByVal:function(input){
             var tree = newTree(input);
             if(tree.error){
                 outf(tree.msg);
                 return false;
                 }
-            evalCallByVal(outf,tree.stmts.args);
+            evalWithStrats(tree.stmts.args).callByValue();
             return true;
             },
-        printTree:function(outf,input){
+        evalCallByName:function(input){
             var tree = newTree(input);
             if(tree.error){
                 outf(tree.msg);
                 return false;
                 }
-            printTree(outf,tree.stmts);
+            evalWithStrats(tree.stmts.args).callByName();
+            return true;
+            },
+        printTree:function(input){
+            var tree = newTree(input);
+            if(tree.error){
+                outf(tree.msg);
+                return false;
+                }
+            printTree(tree.stmts.args[tree.stmts.args.length - 1]);
             return true;
             }
         };

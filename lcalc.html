@@ -11,18 +11,29 @@
         <p id="output0"></p>
         <p id="output"></p>
         <span class="prg">
-    //let a = (\ x . \ y . \ z . a b c) b;
-    //let b = c;
-    //(\ x . \ y . \ z . a z x) d e f
-    let a = \ x . \ y . x;
-    a one two
+    //build in
+    let id = \ v . v;
+    //test funs
+    let closure = (\ v . id v) cval;
+
+    //logical operators
+    let true = \ t . \ f . t;
+    let false = \ t . \ f . f;
+    let and = \ b . \ c . b c false;
+    let or = \ b . \ c . b true c;
+    let not = \ b . b false true;
+    let imp = \ b . \ c . or (not b) c;
+
+    //conditional
+    let test = \ l . \ m . \ n . l m n;
+    
+    //testing
+    //test (not true) if else
+    test (imp false true) t f
         </span>
         <script src="stack.js"></script>
         <script src="lcalc.js"></script>
         <script>
-            var prgs = document.getElementsByClassName("prg");
-            var prg = prgs[0];
-            var llang = new LambdaLang();
             var printfn = function(){
                 var elm = document.getElementById("output");
                 elm.style.fontFamily = "monospace";
@@ -32,6 +43,9 @@
                     elm.innerHTML += line + "\n";
                     };
                 }();
+            var prgs = document.getElementsByClassName("prg");
+            var prg = prgs[0];
+            var llang = new LambdaLang(printfn);
             var printCode = function(){
                 var texta = document.getElementById("output0");
                 texta.style.backgroundColor = "black";
@@ -41,10 +55,10 @@
                 texta.style.whiteSpace = "pre";
                 texta.innerHTML = prg.innerHTML;
                 }();
-            llang.printTree(printfn,prg.innerHTML);
+            llang.printTree(prg.innerHTML);
             printfn("---------------------------------------");
             printfn("---------------------------------------");
-            llang.evalCallByVal(printfn,prg.innerHTML);
+            llang.evalCallByVal(prg.innerHTML);
         </script>
     </body>
 </html>
