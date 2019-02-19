@@ -691,27 +691,39 @@ var LambdaLang = function(outf){
             }
         return -1;
         };
-    var scopeSubFirst = function(scope,depth,v){
+    var scopeSubFirst = function(scope,v){
         if(!isVar(v)){
             return v;
             }
-        while(depth >= 0){
-            if(scope[depth] !== undefined && scope[depth][v.v] !== undefined){
-                return scope[depth][v.v];
+        for(var i = scope.length - 1; i >= 0; i--){
+            if(scope[i] !== undefined && scope[i][v.v] !== undefined){
+                return scope[i][v.v];
                 }
-            depth--;
             }
         return v;
         };
-    var scopeAdd = function(scope,depth,id,v){
-        if(scope[depth] === undefined){
-            scope[depth] = {};
+    var scopePush = function(scope,id,v){
+        if(id === null || v === null){
+            scope.push({});
+            return true;
             }
-        scope[depth][id] = v;
+        var level = {};
+        level[id] = v;
+        scope.push(level);
+        return true;
+        };
+    var scopePop = function(scope){ 
+        var retval = scope[scope.length - 1];
+        scope.splice(-1,1);
+        return retval;
+        };
+    var scopeAdd = function(scope,id,v){
+        var d = scope.length - 1;
+        scope[d][id] = v;
         return true;
         };
     var scopeCopy = function(s){
-        return JSON.parse(JSON.stringify(s));
+        return s.slice();
         };
     var treeAppendApps = function(apps,tree){
         // append those apps that are still
@@ -755,7 +767,7 @@ var LambdaLang = function(outf){
             // clear level scope
             switch(t.type){
                 case "var":
-                    var v = scopeSubFirst(scope,depth,t);
+                    var v = scopeSubFirst(scope,t);
                     if(isAbstr(v)){
                         return exec(depth+1,v.closure,apps,v);
                         }
@@ -763,34 +775,40 @@ var LambdaLang = function(outf){
                 case "abstraction":
                     var topArg = apps.pop();
                     if(topArg === null){
-                        scope[depth] = {};
                         return t;
                         }
-                    if(isAbstr(topArg)){
-                        topArg.closure = scopeCopy(scope);
+                    scopePush(scope,t.binder.v,topArg);
+                    //scopeAdd(scope,depth,t.binder.v,topArg);
+                    var retval = exec(depth+1,t.closure || scope,apps,t.body);
+                    if(isAbstr(retval)){
+                        retval.closure = retval.closure || [];
+                        alert(t.binder.v + "->"+topArg.v);
+                        scopePush(retval.closure,t.binder.v,topArg);
                         }
-                    scopeAdd(scope,depth,t.binder.v,topArg);
-                    var retval = exec(depth+1,scope,apps,t.body);
-                    scope[depth] = {};
+                    scopePop(scope);
                     return retval;
                 case "apply":
-                    // Eval arg with new stack to avoid mix up
                     var arg = function(){
                         if(strat.isCallByValue()){
+                            // Eval arg with new stack to avoid mix up
                             var apps0 = new Stack();
                             var retval = exec(depth+1,scope,apps0,t.arg);
-                            return treeAppendApps(apps0,retval);
+                            retval = treeAppendApps(apps0,retval);
+                            if(isAbstr(retval)){
+                                retval.closure = scopeCopy(scope);
+                                }
+                            return retval;
                             }
+                        //add closure
                         return t.arg;
                         }();
-                    //apps.push(treeAppendApps(apps0,arg));
                     apps.push(arg);
                     return exec(depth+1,scope,apps,t.fun);
                 }
             };
         var startEval = function(){
             // Loop through statements
-            var scope = {0:{}};
+            var scope = [{}];
             for(var i = 0; i < stmts.length; i++){
                 var stmt = stmts[i];
                 if(stmt.type === "binding"){

@@ -23,13 +23,20 @@
     let or = \ b . \ c . b true c;
     let not = \ b . b false true;
     let imp = \ b . \ c . or (not b) c;
+    
+    //pairs
+    //let pair = \ f . \ s . \ b . b f s;
+    let pair = \ aa . \ bb . \ cc . cc aa bb;
+    let fst = \ p . p true;
+    let snd = \ p . p false;
 
     //conditional
     let test = \ l . \ m . \ n . l m n;
     
     //testing
     //test (not true) if else
-    test (imp false true) t f
+    //test (imp false true) t f
+    fst (pair v w)
         </span>
         <script src="stack.js"></script>
         <script src="lcalc.js"></script>
