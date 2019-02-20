@@ -778,11 +778,11 @@ var LambdaLang = function(outf){
                         return t;
                         }
                     scopePush(scope,t.binder.v,topArg);
-                    //scopeAdd(scope,depth,t.binder.v,topArg);
-                    var retval = exec(depth+1,t.closure || scope,apps,t.body);
+                    var retval = exec(depth+1,t.closure||scope,apps,t.body);
                     if(isAbstr(retval)){
-                        retval.closure = retval.closure || [];
-                        alert(t.binder.v + "->"+topArg.v);
+                        // no copy since pop will not affect the
+                        // new pointer, hopefully
+                        retval.closure = retval.closure || scope;
                         scopePush(retval.closure,t.binder.v,topArg);
                         }
                     scopePop(scope);
@@ -794,9 +794,6 @@ var LambdaLang = function(outf){
                             var apps0 = new Stack();
                             var retval = exec(depth+1,scope,apps0,t.arg);
                             retval = treeAppendApps(apps0,retval);
-                            if(isAbstr(retval)){
-                                retval.closure = scopeCopy(scope);
-                                }
                             return retval;
                             }
                         //add closure

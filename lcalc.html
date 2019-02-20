@@ -25,8 +25,7 @@
     let imp = \ b . \ c . or (not b) c;
     
     //pairs
-    //let pair = \ f . \ s . \ b . b f s;
-    let pair = \ aa . \ bb . \ cc . cc aa bb;
+    let pair = \ f . \ s . \ b . b f s;
     let fst = \ p . p true;
     let snd = \ p . p false;
 
@@ -36,7 +35,8 @@
     //testing
     //test (not true) if else
     //test (imp false true) t f
-    fst (pair v w)
+    //snd (pair v w)
+    test (and (snd (pair false true)) (fst (pair true false))) if else
         </span>
         <script src="stack.js"></script>
         <script src="lcalc.js"></script>
