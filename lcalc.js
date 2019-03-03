@@ -717,13 +717,50 @@ var LambdaLang = function(outf){
         scope.splice(-1,1);
         return retval;
         };
-    var scopeAdd = function(scope,id,v){
+    var scopeAdd1 = function(scope,id,v){
         var d = scope.length - 1;
         scope[d][id] = v;
         return true;
         };
     var scopeCopy = function(s){
         return s.slice();
+        };
+    var scopeGetIgn = function(s,v){
+        if(!isVar(v)){
+            return v;
+            }
+        var id = v.v;
+        if(s[id] !== undefined && s[id] !== null){
+            return s[id];
+            }
+        return v;
+        };
+    var scopeGetNull = function(s,v){
+        if(!isVar(v)){
+            return null;
+            }
+        var id = v.v;
+        if(s[id] !== undefined){
+            return s[id];
+            }
+        return null;
+        };
+    var scopeGet = function(s,v){
+        if(!isVar(v)){
+            return v;
+            }
+        var id = v.v;
+        if(s[id] !== undefined){
+            return s[id];
+            }
+        outf("error: id '"+id+"' not present in scope");
+        return null;
+        };
+    var scopeAdd = function(s,id,v){
+        s[id] = v;
+        };
+    var scopeClone = function(s){
+        return JSON.parse(JSON.stringify(s));
         };
     var treeAppendApps = function(apps,tree){
         // append those apps that are still
@@ -763,11 +800,10 @@ var LambdaLang = function(outf){
                 }
             };
         var exec = function(depth,scope,apps,t){
-            // After further recursion returns in abstractions,
-            // clear level scope
             switch(t.type){
                 case "var":
-                    var v = scopeSubFirst(scope,t);
+                    //var v = scopeSubFirst(scope,t);
+                    var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
                         return exec(depth+1,v.closure,apps,v);
                         }
@@ -777,15 +813,20 @@ var LambdaLang = function(outf){
                     if(topArg === null){
                         return t;
                         }
-                    scopePush(scope,t.binder.v,topArg);
+                    //scopePush(scope,t.binder.v,topArg);
+                    var oldScopeVal = function(){
+                        var v = scopeGetNull(scope,t.binder.v);
+                        scopeAdd(scope,t.binder.v,topArg);
+                        return v;
+                        }();
                     var retval = exec(depth+1,t.closure||scope,apps,t.body);
                     if(isAbstr(retval)){
-                        // no copy since pop will not affect the
-                        // new pointer, hopefully
-                        retval.closure = retval.closure || scope;
-                        scopePush(retval.closure,t.binder.v,topArg);
+                        retval.closure = retval.closure || scopeClone(scope);
+                        scopeAdd(retval.closure,t.binder.v,topArg);
+                        //scopePush(retval.closure,t.binder.v,topArg);
                         }
-                    scopePop(scope);
+                    //scopePop(scope);
+                    scopeAdd(scope,t.binder.v,oldScopeVal);
                     return retval;
                 case "apply":
                     var arg = function(){
@@ -805,21 +846,23 @@ var LambdaLang = function(outf){
             };
         var startEval = function(){
             // Loop through statements
-            var scope = [{}];
+            //var scope = [{}];
+            var scope = {};
             for(var i = 0; i < stmts.length; i++){
                 var stmt = stmts[i];
+                var apps = new Stack();
                 if(stmt.type === "binding"){
                     // Since call-by-val: eval all bindings
                     // before pasted into scope
-                    var apps = new Stack();
                     var term = exec(1,scope,apps,stmt.term);
                     if(isAbstr(term)){
-                        term.closure = scopeCopy(scope);
+                        term.closure = scopeClone(scope);
                         }
-                    scope[0][stmt.id] = treeAppendApps(apps,term);
+                    //scope[0][stmt.id] = treeAppendApps(apps,term);
+                    //scope[stmt.id] = treeAppendApps(apps,term);
+                    scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
                     continue;
                     }
-                var apps = new Stack();
                 var evaled  = exec(0,scope,apps,stmt);
                 var evaledWithArgs = treeAppendApps(apps,evaled);
                 outf(tree2str(evaledWithArgs));
