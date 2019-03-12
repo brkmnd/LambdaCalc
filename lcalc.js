@@ -846,7 +846,6 @@ var LambdaLang = function(outf){
             };
         var startEval = function(){
             // Loop through statements
-            //var scope = [{}];
             var scope = {};
             for(var i = 0; i < stmts.length; i++){
                 var stmt = stmts[i];
