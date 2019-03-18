@@ -64,10 +64,16 @@ let closure = (\ a . \ b . \ c . b c) ctest1 ctest2;
 // testing
 closure a
 </span>
+<!-- Failing Programs -->
+<span class="prg" id="prg-closure1">// Closure1 (fail)
+let id = \ v . v;
+let closure = (\ a . \ b . \ c . b c) cls1 (\ a . c);
+closure a
+</span>
 <script src="stack.js"></script>
 <script src="lcalc.js"></script>
 <script>
-    var prgId = 2;
+    var prgId = 4;
     var printfn = function(){
         var elm = document.getElementById("output");
         elm.style.fontFamily = "monospace";

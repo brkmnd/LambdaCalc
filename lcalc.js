@@ -616,7 +616,7 @@ var LambdaLang = function(outf){
             return {error:true,msg:t.msg,stmts:null};
             }
         if(parsed.count() > 0){
-            alert("not empty absyn-stack");
+            outf("error","not empty absyn-stack");
             }
         return {error:false,msg:"",stmts:t};
         };
@@ -822,7 +822,8 @@ var LambdaLang = function(outf){
                 case "var":
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
-                        return exec(depth+1,v.closure,apps,v);
+                        // Clean lambda givin as arg have undef. closure
+                        return exec(depth+1,v.closure||{},apps,v);
                         }
                     return v;
                 case "abstraction":
