@@ -1,7 +1,5 @@
-# Lambda Calculus JS Implementation
+# Lambda Calculus Interpreter written in Java Script
 
 This is an implementation of the simple lambda calculus as described in the book Types and Programming Languages by B. C. Pierce.
 
-The project can be found at http://brkmnd.com/pages/projects/Default.aspx?id=31.
-
-More will come later.
+The project can be found at http://brkmnd.com/pages/projects/Default.aspx?id=31 - both description and usage.

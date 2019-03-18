@@ -1,80 +1,118 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <style>
-            .prg {
-                display:none;
-            }
-        </style>
-    </head>
-    <body>
-        <p id="output0"></p>
-        <p id="output"></p>
-        <span class="prg">
-    //build in
-    let id = \ v . v;
-    //test funs
-    let closure = (\ cl1 . \ cl2 . \ cl3 . cl2 cl3) ctest1 ctest2;
+<head>
+<style>
+.prg {
+    display:none;
+}
+</style>
+</head>
+<body>
+<p id="output0"></p>
+<p id="output"></p>
+<span class="prg" id="prg-numerals">// Numerals
+let 0 = \ s . \ z . z;
+let 1 = \ s . \ z . s z;
+let 2 = \ s . \ z . s (s z);
+let 3 = \ s . \ z . s (s (s z));
+let scc = \ n . \ s . \ z . (n s z);
+let plus = \ m . \ n . \ s . \ z . m s (n s z);
+scc 0
+</span>
+<span class="prg" id="prg-logic">// Logic
+let id = \ v . v;
+// operators
+let true = \ t . \ f . t;
+let false = \ t . \ f . f;
+let and = \ b . \ c . b c false;
+let or = \ b . \ c . b true c;
+let not = \ b . b false true;
+let imp = \ b . \ c . or (not b) c;
 
-    //logical operators
-    let true = \ t . \ f . t;
-    let false = \ t . \ f . f;
-    let and = \ b . \ c . b c false;
-    let or = \ b . \ c . b true c;
-    let not = \ b . b false true;
-    let imp = \ b . \ c . or (not b) c;
+// conditional
+let test = \ l . \ m . \ n . l m n;
 
-    //numerals
-    //let c0 = \ s . \ z . z;
-    //let c1 = \ s . \ z . s z;
-    //let c2 = \ s . \ z . s (s z);
-    //let c3 = \ s . \ z . s (s (s z));
-    //let scc = \ n . \ s . \ z . (n s z);
-    //let plus = \ m . \ n . \ s . \ z . m s (n s z);
-    
-    //pairs
-    let pair = \ f . \ s . \ b . b f s;
-    let fst = \ p . p true;
-    let snd = \ p . p false;
+// testing
+//test (not true) if else
+test (imp false true) if else
+</span>
+<span class="prg" id="prg-pairs">// Pairs
+let id = \ v . v;
+// operators
+let true = \ t . \ f . t;
+let false = \ t . \ f . f;
+let and = \ b . \ c . b c false;
+let or = \ b . \ c . b true c;
+let not = \ b . b false true;
+let imp = \ b . \ c . or (not b) c;
 
-    //conditional
-    let test = \ l . \ m . \ n . l m n;
-    
-    //testing
-    //test (not true) if else
-    //test (imp false true) t f
-    //snd (pair v w)
-    //test (imp (snd (pair false true)) (fst (pair true false))) if else
-    closure
-        </span>
-        <script src="stack.js"></script>
-        <script src="lcalc.js"></script>
-        <script>
-            var printfn = function(){
-                var elm = document.getElementById("output");
-                elm.style.fontFamily = "monospace";
-                elm.style.fontSize = "12pt";
-                elm.style.whiteSpace = "pre";
-                return function(ptype,line){
-                    elm.innerHTML += line + "\n";
-                    };
-                }();
-            var prgs = document.getElementsByClassName("prg");
-            var prg = prgs[0];
-            var llang = new LambdaLang(printfn);
-            var printCode = function(){
-                var texta = document.getElementById("output0");
-                texta.style.backgroundColor = "black";
-                texta.style.color = "white";
-                texta.style.fontFamily = "monospace";
-                texta.style.fontSize = "12pt";
-                texta.style.whiteSpace = "pre";
-                texta.innerHTML = prg.innerHTML;
-                }();
-            llang.printTree(prg.innerHTML);
-            printfn("","---------------------------------------");
-            printfn("","---------------------------------------");
-            llang.evalCallByVal(prg.innerHTML);
-        </script>
-    </body>
+// conditional
+let test = \ l . \ m . \ n . l m n;
+
+// pairs
+let pair = \ f . \ s . \ b . b f s;
+let fst = \ p . p true;
+let snd = \ p . p false;
+
+// testing
+//snd (pair v w)
+test (imp (snd (pair false true)) (fst (pair true false))) if else
+</span>
+<span class="prg" id="prg-closures">// Closures
+let id = \ v . v;
+let closure = (\ a . \ b . \ c . b c) ctest1 ctest2;
+// testing
+closure a
+</span>
+<script src="stack.js"></script>
+<script src="lcalc.js"></script>
+<script>
+    var prgId = 2;
+    var printfn = function(){
+        var elm = document.getElementById("output");
+        elm.style.fontFamily = "monospace";
+        elm.style.fontSize = "12pt";
+        elm.style.whiteSpace = "pre";
+        return function(ptype,line){
+            switch(ptype){
+                case "error":
+                    elm.innerHTML += "<font color='red'>"+line+"</font>";
+                    break;
+                case "env":
+                    elm.innerHTML += "&rho;"+line;
+                    break;
+                case "res":
+                    elm.innerHTML += line;
+                    break;
+                case "tnode":
+                    elm.innerHTML += line;
+                    break;
+                default:
+                    elm.innerHTML += line;
+                    break;
+                }
+            elm.innerHTML += "\n";
+            };
+        }();
+    var prgs = document.getElementsByClassName("prg");
+    var prg = prgs[prgId];
+    var llang = new LambdaLang(printfn);
+    var printCode = function(){
+        var texta = document.getElementById("output0");
+        texta.style.backgroundColor = "black";
+        texta.style.color = "white";
+        texta.style.fontFamily = "monospace";
+        texta.style.fontSize = "12pt";
+        texta.style.whiteSpace = "pre";
+        texta.innerHTML = prg.innerHTML;
+        }();
+    // Print the parsing tree
+    printfn("","----Abstact Syntax Tree");
+    llang.printTree(prg.innerHTML);
+    printfn("","");
+    printfn("","----Evaluation Result");
+    // Print result
+    llang.evalCallByVal(prg.innerHTML);
+</script>
+</body>
 </html>
