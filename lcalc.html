@@ -67,7 +67,8 @@ closure a
 <!-- Failing Programs -->
 <span class="prg" id="prg-closure1">// Closure1 (fail)
 let id = \ v . v;
-let closure = (\ a . \ b . \ c . b c) cls1 (\ a . c);
+let f1 = \ a . a;
+let closure = (\ a . \ b . \ c . b c) cls1 (\ a . f1);
 closure a
 </span>
 <script src="stack.js"></script>

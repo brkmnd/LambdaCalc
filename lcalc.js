@@ -822,13 +822,15 @@ var LambdaLang = function(outf){
                 case "var":
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
-                        // Clean lambda givin as arg have undef. closure
-                        return exec(depth+1,v.closure||{},apps,v);
+                        return exec(depth+1,v.closure,apps,v);
                         }
                     return v;
                 case "abstraction":
                     var topArg = apps.pop();
                     if(topArg === null){
+                        // Clean lambda givin as arg have undef. closure
+                        // this fixes.
+                        t.closure = scopeClone(scope);
                         return t;
                         }
                     var oldScopeVal = function(){
