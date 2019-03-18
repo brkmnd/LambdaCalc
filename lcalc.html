@@ -14,7 +14,7 @@
     //build in
     let id = \ v . v;
     //test funs
-    let closure = (\ v . id v) cval;
+    let closure = (\ cl1 . \ cl2 . \ cl3 . cl2 cl3) ctest1 ctest2;
 
     //logical operators
     let true = \ t . \ f . t;
@@ -23,6 +23,14 @@
     let or = \ b . \ c . b true c;
     let not = \ b . b false true;
     let imp = \ b . \ c . or (not b) c;
+
+    //numerals
+    //let c0 = \ s . \ z . z;
+    //let c1 = \ s . \ z . s z;
+    //let c2 = \ s . \ z . s (s z);
+    //let c3 = \ s . \ z . s (s (s z));
+    //let scc = \ n . \ s . \ z . (n s z);
+    //let plus = \ m . \ n . \ s . \ z . m s (n s z);
     
     //pairs
     let pair = \ f . \ s . \ b . b f s;
@@ -36,7 +44,8 @@
     //test (not true) if else
     //test (imp false true) t f
     //snd (pair v w)
-    test (imp (snd (pair false true)) (fst (pair true false))) if else
+    //test (imp (snd (pair false true)) (fst (pair true false))) if else
+    closure
         </span>
         <script src="stack.js"></script>
         <script src="lcalc.js"></script>
@@ -46,7 +55,7 @@
                 elm.style.fontFamily = "monospace";
                 elm.style.fontSize = "12pt";
                 elm.style.whiteSpace = "pre";
-                return function(line){
+                return function(ptype,line){
                     elm.innerHTML += line + "\n";
                     };
                 }();
@@ -63,8 +72,8 @@
                 texta.innerHTML = prg.innerHTML;
                 }();
             llang.printTree(prg.innerHTML);
-            printfn("---------------------------------------");
-            printfn("---------------------------------------");
+            printfn("","---------------------------------------");
+            printfn("","---------------------------------------");
             llang.evalCallByVal(prg.innerHTML);
         </script>
     </body>

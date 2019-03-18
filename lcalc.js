@@ -121,8 +121,8 @@ var LambdaLang = function(outf){
             "(\\))|"+
             "(;)|"+
             "(let)|"+
-            "([a-z]+)|"+
-            "\\/\\/[^\\n]*\\n|"+
+            "([a-zA-Z0-9_\\-]+)|"+
+            "\\/\\/[^\\n]*|"+
             " +|\\n+";
         var rx = new RegExp(rxStr,"g");
         var retI = 0;
@@ -130,6 +130,7 @@ var LambdaLang = function(outf){
         var linepos = {lnr:1,start:0};
         var resStr = inStr.replace(rx,
             function(a,i1,i2,i3,i4,i5,i6,i7,i8,posX){
+                linepos.x = posX;
                 if(a === "\n"){
                     linepos.lnr++;
                     linepos.start = posX;
@@ -629,7 +630,7 @@ var LambdaLang = function(outf){
     var printLexed = function(l){
         var i = 0;
         while(l[i] !== undefined){
-            outf(l[i].tt);
+            outf("token",l[i].tt);
             i++;
             }
         };
@@ -637,14 +638,14 @@ var LambdaLang = function(outf){
         var exec = function(depth,t){
             switch(t.type){
                 case "var":
-                    outf(printSpaces(depth)+"var."+t.v);
+                    outf("tnode",printSpaces(depth)+"var."+t.v);
                     break;
                 case "abstraction":
-                    outf(printSpaces(depth)+"&lambda;"+t.binder.v+".");
+                    outf("tnode",printSpaces(depth)+"&lambda;"+t.binder.v+".");
                     exec(depth+1,t.body);
                     break;
                 case "apply":
-                    outf(printSpaces(depth)+"apply");
+                    outf("tnode",printSpaces(depth)+"apply");
                     exec(depth+1,t.arg);
                     exec(depth+1,t.fun);
                     break;
@@ -662,7 +663,7 @@ var LambdaLang = function(outf){
                 case "abstraction":
                     str += "&lambda;";
                     str += t.binder.v;
-                    str += ".";
+                    str += ". ";
                     exec(t.body);
                     break;
                 case "apply":
@@ -681,6 +682,23 @@ var LambdaLang = function(outf){
             };
         exec(tree);
         return str;
+        };
+    var closure2str = function(cls){
+        var ks = Object.keys(cls || {});
+        var res = "";
+        res += "[";
+        for(var i = 0; i < ks.length; i++){
+            var key = ks[i];
+            res += key;
+            res += " &#8614; ";
+            res += tree2str(cls[key]);
+            res += ", ";
+            }
+        if(ks.length > 0){
+            res = res.substring(0,res.length - 2);
+            }
+        res += "]";
+        return res;
         };
     var scopeSearchUp = function(scope,depth,v){
         while(depth >= 0){
@@ -753,7 +771,7 @@ var LambdaLang = function(outf){
         if(s[id] !== undefined){
             return s[id];
             }
-        outf("error: id '"+id+"' not present in scope");
+        outf("error","error: id '"+id+"' not present in scope");
         return null;
         };
     var scopeAdd = function(s,id,v){
@@ -802,7 +820,6 @@ var LambdaLang = function(outf){
         var exec = function(depth,scope,apps,t){
             switch(t.type){
                 case "var":
-                    //var v = scopeSubFirst(scope,t);
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
                         return exec(depth+1,v.closure,apps,v);
@@ -813,7 +830,6 @@ var LambdaLang = function(outf){
                     if(topArg === null){
                         return t;
                         }
-                    //scopePush(scope,t.binder.v,topArg);
                     var oldScopeVal = function(){
                         var v = scopeGetNull(scope,t.binder.v);
                         scopeAdd(scope,t.binder.v,topArg);
@@ -823,21 +839,20 @@ var LambdaLang = function(outf){
                     if(isAbstr(retval)){
                         retval.closure = retval.closure || scopeClone(scope);
                         scopeAdd(retval.closure,t.binder.v,topArg);
-                        //scopePush(retval.closure,t.binder.v,topArg);
                         }
-                    //scopePop(scope);
                     scopeAdd(scope,t.binder.v,oldScopeVal);
                     return retval;
                 case "apply":
                     var arg = function(){
                         if(strat.isCallByValue()){
                             // Eval arg with new stack to avoid mix up
+                            // With this strategy eval arg first thing
                             var apps0 = new Stack();
                             var retval = exec(depth+1,scope,apps0,t.arg);
                             retval = treeAppendApps(apps0,retval);
                             return retval;
                             }
-                        //add closure
+                        // Add closure - strategy is unfinished
                         return t.arg;
                         }();
                     apps.push(arg);
@@ -855,16 +870,15 @@ var LambdaLang = function(outf){
                     // before pasted into scope
                     var term = exec(1,scope,apps,stmt.term);
                     if(isAbstr(term)){
-                        term.closure = scopeClone(scope);
+                        term.closure = term.closure || scopeClone(scope);
                         }
-                    //scope[0][stmt.id] = treeAppendApps(apps,term);
-                    //scope[stmt.id] = treeAppendApps(apps,term);
                     scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
                     continue;
                     }
                 var evaled  = exec(0,scope,apps,stmt);
                 var evaledWithArgs = treeAppendApps(apps,evaled);
-                outf(tree2str(evaledWithArgs));
+                outf("env",closure2str(evaledWithArgs.closure));
+                outf("res",tree2str(evaledWithArgs));
                 }
             };
         return {
@@ -882,7 +896,7 @@ var LambdaLang = function(outf){
         evalCallByVal:function(input){
             var tree = newTree(input);
             if(tree.error){
-                outf(tree.msg);
+                outf("error",tree.msg);
                 return false;
                 }
             evalWithStrats(tree.stmts.args).callByValue();
@@ -891,7 +905,7 @@ var LambdaLang = function(outf){
         evalCallByName:function(input){
             var tree = newTree(input);
             if(tree.error){
-                outf(tree.msg);
+                outf("error",tree.msg);
                 return false;
                 }
             evalWithStrats(tree.stmts.args).callByName();
@@ -900,7 +914,7 @@ var LambdaLang = function(outf){
         printTree:function(input){
             var tree = newTree(input);
             if(tree.error){
-                outf(tree.msg);
+                outf("error",tree.msg);
                 return false;
                 }
             printTree(tree.stmts.args[tree.stmts.args.length - 1]);

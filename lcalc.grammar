@@ -9,7 +9,7 @@ token       "lpar"  ,"rpar"     ,"scolon"
 token       "let"
     as      "let"
 token -cap  "var"
-    as      "[a-z]+"
+    as      "[a-zA-Z0-9_\\-]+"
 !token      " "
 
 
