@@ -11,14 +11,41 @@
 <p id="output0"></p>
 <p id="output"></p>
 <span class="prg" id="prg-numerals">// Numerals
+let id = \ v . v;
+// bools
+let true = \ t . \ f . t;
+let false = \ t . \ f . f;
+let test = \ l . \ m . \ n . l m n;
+// pairs
+let pair = \ f . \ s . \ b . b f s;
+let fst = \ p . p true;
+let snd = \ p . p false;
+
+// church numerals
 let 0 = (\ s . \ z . z);
 let 1 = (\ s . \ z . s z);
 let 2 = (\ s . \ z . s (s z));
 let 3 = \ s . \ z . s (s (s z));
+
+// num operators
 let isZero = \ m . m (\ x . false) true;
 let scc = \ n . \ s . \ z . s (n s z);
 let plus = \ m . \ n . \ s . \ z . m s (n s z);
-isZero 1
+
+// num operators decs
+let zz = pair 0 0;
+let ss = \ p . pair (snd p) (plus 1 (snd p));
+let prd = \ m . fst (m ss zz);
+let minus = \ m . \ n . n prd m;
+let times = \ m . \ n . m (plus n) 0;
+
+// testing
+//test (isZero 0) yes no
+//isZero (prd 1)
+//isZero (plus 3 1)
+//isZero (minus 3 1)
+//isZero (times 3 0)
+test (isZero (minus 2 1)) yes no
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
@@ -72,11 +99,17 @@ let f1 = \ a . a;
 let closure = (\ a . \ b . \ c . b c) cls1 (\ a . f1);
 closure a
 </span>
+<span class="prg" id="prg-closure2">// Closures 2
+let id = \ v . v;
+let f1 = \ a . a;
+let closure = (\ a . \ b . \ c . b c a) cls1 (\ a . (\ b . b) f1);
+closure a
+</span>
 <!-- Failing Programs -->
 <script src="stack.js"></script>
 <script src="lcalc.js"></script>
 <script>
-    var prgName = "closure1";
+    var prgName = "numerals";
     var printfn = function(){
         var elm = document.getElementById("output");
         elm.style.fontFamily = "monospace";
@@ -120,7 +153,12 @@ closure a
     printfn("","");
     printfn("","----Evaluation Result");
     // Print result
-    llang.evalCallByVal(prg.innerHTML);
+    try {
+        llang.evalCallByVal(prg.innerHTML)
+    } catch(err) {
+        printfn("error","runtime error: "+err.message);
+    }
+    printfn("","recs:"+llang.getRecs().toString());
 </script>
 </body>
 </html>

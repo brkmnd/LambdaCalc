@@ -743,9 +743,6 @@ var LambdaLang = function(outf){
         scope[d][id] = v;
         return true;
         };
-    var scopeCopy = function(s){
-        return s.slice();
-        };
     var scopeGetIgn = function(s,v){
         if(!isVar(v)){
             return v;
@@ -784,11 +781,27 @@ var LambdaLang = function(outf){
     var scopeKeys = function(s){
         return Object.keys(s);
         };
+    var scopeForeach = function(s,f){
+        var ks = scopeKeys(s);
+        for(var i = 0; i < ks.length; i++){
+            var k = ks[i];
+            f(k,s[k]);
+            }
+        };
     var scopeAdd = function(s,id,v){
         s[id] = v;
         };
     var scopeClone = function(s){
         return JSON.parse(JSON.stringify(s));
+        };
+    var scopeCopy = function(s){
+        // Since values are immutabel
+        // closure can be set using shallow copy
+        var retval = {};
+        scopeForeach(s,function(k,v){
+            retval[k] = v;
+            });
+        return retval;
         };
     var treeAppendApps = function(apps,tree){
         // append those apps that are still
@@ -808,6 +821,7 @@ var LambdaLang = function(outf){
     var isVar = function(v){
         return v.type === "var";
         };
+    var evalRecs = 0;
     var evalWithStrats = function(stmts){
         // Strict eval of arguments
         // Reduce from out to in only as long
@@ -828,6 +842,7 @@ var LambdaLang = function(outf){
                 }
             };
         var exec = function(depth,scope,apps,t){
+            evalRecs++;
             switch(t.type){
                 case "var":
                     var v = scopeGetIgn(scope,t);
@@ -840,10 +855,11 @@ var LambdaLang = function(outf){
                 case "abstraction":
                     var topArg = apps.pop();
                     if(topArg === null){
-                        // Returns partial evaluated abstr.
-                        // If closure present, then clone will add
-                        // further bindings to that
-                        t.closure = scopeClone(scope);
+                        // Final return is abstraction
+                        // If closure present, then copy will add
+                        // partial applications to that since that closure
+                        // is passed as scope from start
+                        t.closure = scopeCopy(scope);
                         return t;
                         }
                     var oldScopeVal = function(){
@@ -885,15 +901,7 @@ var LambdaLang = function(outf){
                     // Since call-by-val: eval all bindings
                     // before pasted into scope
                     var term = exec(1,scope,apps,stmt.term);
-                    // closures is added when evaluating
-                    if(isAbstr(term) && term.closure === undefined){
-                        alert("undef closure in eval let");
-                        }
-                    /*
-                    if(isAbstr(term)){
-                        term.closure = term.closure || scopeClone(scope);
-                        }
-                    */
+                    // closure is added when evaluating
                     scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
                     continue;
                     }
@@ -941,6 +949,9 @@ var LambdaLang = function(outf){
                 }
             printTree(tree.stmts.args[tree.stmts.args.length - 1]);
             return true;
+            },
+        getRecs:function(){
+            return evalRecs;
             }
         };
     };
