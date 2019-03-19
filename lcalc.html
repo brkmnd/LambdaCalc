@@ -11,13 +11,14 @@
 <p id="output0"></p>
 <p id="output"></p>
 <span class="prg" id="prg-numerals">// Numerals
-let 0 = \ s . \ z . z;
-let 1 = \ s . \ z . s z;
-let 2 = \ s . \ z . s (s z);
+let 0 = (\ s . \ z . z);
+let 1 = (\ s . \ z . s z);
+let 2 = (\ s . \ z . s (s z));
 let 3 = \ s . \ z . s (s (s z));
-let scc = \ n . \ s . \ z . (n s z);
+let isZero = \ m . m (\ x . false) true;
+let scc = \ n . \ s . \ z . s (n s z);
 let plus = \ m . \ n . \ s . \ z . m s (n s z);
-scc 0
+isZero 1
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
