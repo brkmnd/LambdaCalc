@@ -885,9 +885,15 @@ var LambdaLang = function(outf){
                     // Since call-by-val: eval all bindings
                     // before pasted into scope
                     var term = exec(1,scope,apps,stmt.term);
+                    // closures is added when evaluating
+                    if(isAbstr(term) && term.closure === undefined){
+                        alert("undef closure in eval let");
+                        }
+                    /*
                     if(isAbstr(term)){
                         term.closure = term.closure || scopeClone(scope);
                         }
+                    */
                     scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
                     continue;
                     }
