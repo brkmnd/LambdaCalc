@@ -680,11 +680,14 @@ var LambdaLang = function(outf){
                     break;
                 }
             };
+        if(tree === null){
+            return "null-tree";
+            }
         exec(tree);
         return str;
         };
     var closure2str = function(cls){
-        var ks = Object.keys(cls || {});
+        var ks = scopeKeys(cls || {});
         var res = "";
         res += "[";
         for(var i = 0; i < ks.length; i++){
@@ -774,6 +777,13 @@ var LambdaLang = function(outf){
         outf("error","error: id '"+id+"' not present in scope");
         return null;
         };
+    var scopeSize = function(s){
+        var k = Object.keys(s);
+        return k.length;
+        };
+    var scopeKeys = function(s){
+        return Object.keys(s);
+        };
     var scopeAdd = function(s,id,v){
         s[id] = v;
         };
@@ -822,27 +832,30 @@ var LambdaLang = function(outf){
                 case "var":
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
+                        // Apply from old app stack, corresponds to
+                        // (\ a . id) a b => id b => b
                         return exec(depth+1,v.closure,apps,v);
                         }
                     return v;
                 case "abstraction":
                     var topArg = apps.pop();
                     if(topArg === null){
-                        // Clean lambda givin as arg have undef. closure
-                        // this fixes.
+                        // Returns partial evaluated abstr.
+                        // If closure present, then clone will add
+                        // further bindings to that
                         t.closure = scopeClone(scope);
                         return t;
                         }
                     var oldScopeVal = function(){
+                        // Save current scope val and bind new (shadowing)
+                        // thus entering scope
                         var v = scopeGetNull(scope,t.binder.v);
                         scopeAdd(scope,t.binder.v,topArg);
                         return v;
                         }();
-                    var retval = exec(depth+1,t.closure||scope,apps,t.body);
-                    if(isAbstr(retval)){
-                        retval.closure = retval.closure || scopeClone(scope);
-                        scopeAdd(retval.closure,t.binder.v,topArg);
-                        }
+                    var retval = exec(depth+1,scope,apps,t.body);
+                    // Overwrite new binding with old val in scope
+                    // thus leaving scope level
                     scopeAdd(scope,t.binder.v,oldScopeVal);
                     return retval;
                 case "apply":

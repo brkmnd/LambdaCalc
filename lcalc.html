@@ -55,8 +55,9 @@ let fst = \ p . p true;
 let snd = \ p . p false;
 
 // testing
-//snd (pair v w)
-test (imp (snd (pair false true)) (fst (pair true false))) if else
+//fst (pair v w)
+test (imp (snd (pair false true)) (snd (pair true false))) if else
+//test (and (snd (pair false true)) (snd (pair true false))) if else
 </span>
 <span class="prg" id="prg-closures">// Closures
 let id = \ v . v;
@@ -64,17 +65,17 @@ let closure = (\ a . \ b . \ c . b c) ctest1 ctest2;
 // testing
 closure a
 </span>
-<!-- Failing Programs -->
-<span class="prg" id="prg-closure1">// Closure1 (fail)
+<span class="prg" id="prg-closure1">// Closure1 (fixed)
 let id = \ v . v;
 let f1 = \ a . a;
 let closure = (\ a . \ b . \ c . b c) cls1 (\ a . f1);
 closure a
 </span>
+<!-- Failing Programs -->
 <script src="stack.js"></script>
 <script src="lcalc.js"></script>
 <script>
-    var prgId = 4;
+    var prgName = "numerals";
     var printfn = function(){
         var elm = document.getElementById("output");
         elm.style.fontFamily = "monospace";
@@ -101,8 +102,7 @@ closure a
             elm.innerHTML += "\n";
             };
         }();
-    var prgs = document.getElementsByClassName("prg");
-    var prg = prgs[prgId];
+    var prg = document.getElementById("prg-"+prgName);
     var llang = new LambdaLang(printfn);
     var printCode = function(){
         var texta = document.getElementById("output0");
