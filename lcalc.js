@@ -821,7 +821,10 @@ var LambdaLang = function(outf){
     var isVar = function(v){
         return v.type === "var";
         };
-    var evalRecs = 0;
+    var recCounts = {
+        defs:0,
+        term:0
+        };
     var evalWithStrats = function(stmts){
         // Strict eval of arguments
         // Reduce from out to in only as long
@@ -841,15 +844,15 @@ var LambdaLang = function(outf){
                 return this.stratVal === "by-name";
                 }
             };
-        var exec = function(depth,scope,apps,t){
-            evalRecs++;
+        var exec = function(depth,scope,apps,t,recCountAdd){
+            recCountAdd();
             switch(t.type){
                 case "var":
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
                         // Apply from old app stack, corresponds to
                         // (\ a . id) a b => id b => b
-                        return exec(depth+1,v.closure,apps,v);
+                        return exec(depth+1,v.closure,apps,v,recCountAdd);
                         }
                     return v;
                 case "abstraction":
@@ -869,7 +872,7 @@ var LambdaLang = function(outf){
                         scopeAdd(scope,t.binder.v,topArg);
                         return v;
                         }();
-                    var retval = exec(depth+1,scope,apps,t.body);
+                    var retval = exec(depth+1,scope,apps,t.body,recCountAdd);
                     // Overwrite new binding with old val in scope
                     // thus leaving scope level
                     scopeAdd(scope,t.binder.v,oldScopeVal);
@@ -880,7 +883,7 @@ var LambdaLang = function(outf){
                             // Eval arg with new stack to avoid mix up
                             // With this strategy eval arg first thing
                             var apps0 = new Stack();
-                            var retval = exec(depth+1,scope,apps0,t.arg);
+                            var retval = exec(depth+1,scope,apps0,t.arg,recCountAdd);
                             retval = treeAppendApps(apps0,retval);
                             return retval;
                             }
@@ -888,7 +891,7 @@ var LambdaLang = function(outf){
                         return t.arg;
                         }();
                     apps.push(arg);
-                    return exec(depth+1,scope,apps,t.fun);
+                    return exec(depth+1,scope,apps,t.fun,recCountAdd);
                 }
             };
         var startEval = function(){
@@ -900,12 +903,12 @@ var LambdaLang = function(outf){
                 if(stmt.type === "binding"){
                     // Since call-by-val: eval all bindings
                     // before pasted into scope
-                    var term = exec(1,scope,apps,stmt.term);
+                    var term = exec(1,scope,apps,stmt.term,function(){ recCounts.defs++; });
                     // closure is added when evaluating
                     scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
                     continue;
                     }
-                var evaled  = exec(0,scope,apps,stmt);
+                var evaled  = exec(0,scope,apps,stmt,function(){ recCounts.term++; });
                 var evaledWithArgs = treeAppendApps(apps,evaled);
                 outf("env",closure2str(evaledWithArgs.closure));
                 outf("res",tree2str(evaledWithArgs));
@@ -950,8 +953,6 @@ var LambdaLang = function(outf){
             printTree(tree.stmts.args[tree.stmts.args.length - 1]);
             return true;
             },
-        getRecs:function(){
-            return evalRecs;
-            }
+        recCounts:recCounts
         };
     };

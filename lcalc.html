@@ -45,7 +45,8 @@ let times = \ m . \ n . m (plus n) 0;
 //isZero (plus 3 1)
 //isZero (minus 3 1)
 //isZero (times 3 0)
-test (isZero (minus 2 1)) yes no
+//test (isZero (minus 2 1)) yes no
+times 3 3
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
@@ -158,7 +159,8 @@ closure a
     } catch(err) {
         printfn("error","runtime error: "+err.message);
     }
-    printfn("","recs:"+llang.getRecs().toString());
+    printfn("","eval depth [defs]:"+llang.recCounts.defs.toString());
+    printfn("","eval depth [term]:"+llang.recCounts.term.toString());
 </script>
 </body>
 </html>
