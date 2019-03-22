@@ -15,7 +15,6 @@ let id = \ v . v;
 // bools
 let true = \ t . \ f . t;
 let false = \ t . \ f . f;
-let test = \ l . \ m . \ n . l m n;
 // pairs
 let pair = \ f . \ s . \ b . b f s;
 let fst = \ p . p true;
@@ -35,9 +34,12 @@ let plus = \ m . \ n . \ s . \ z . m s (n s z);
 // num operators decs
 let zz = pair 0 0;
 let ss = \ p . pair (snd p) (plus 1 (snd p));
-let prd = \ m . fst (m ss zz);
+let prd = \ m0 . fst (m0 ss zz);
 let minus = \ m . \ n . n prd m;
 let times = \ m . \ n . m (plus n) 0;
+
+let test = \ l . \ m . \ n . l m n;
+let isEqual = \ m . \ n . isZero (minus m n);
 
 // testing
 //test (isZero 0) yes no
@@ -45,7 +47,8 @@ let times = \ m . \ n . m (plus n) 0;
 //isZero (plus 3 1)
 //isZero (minus 3 1)
 //isZero (times 3 0)
-test (isZero (minus 2 1)) yes no
+//test (isZero (minus 2 1)) yes no
+prd 2
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
@@ -158,8 +161,13 @@ closure a
     } catch(err) {
         printfn("error","runtime error: "+err.message);
     }
+    printfn("","");
+    printfn("","recs");
     printfn("","eval depth [defs]:"+llang.recCounts.defs.toString());
     printfn("","eval depth [term]:"+llang.recCounts.term.toString());
+    printfn("","eval depth [apps]:"+llang.recCounts.apps.toString());
+    printfn("","eval depth [vars]:"+llang.recCounts.vars.toString());
+    printfn("","eval depth [abstrs]:"+llang.recCounts.abstrs.toString());
 </script>
 </body>
 </html>
