@@ -689,6 +689,23 @@ var LambdaLang = function(outf){
     var treeClone = function(t){
         return JSON.parse(JSON.stringify(t));
         };
+    var treeClearClosures = function(t){
+        switch(t.type){
+            case "abstraction":
+                t.closure = null;
+                return treeClearClosures(t.body);
+            case "apply":
+                return treeClearClosures(t.fun);
+            default:
+                return t;
+            }
+        };
+    var treeClearClosures1 = function(t){
+        if(isAbstr(t)){
+            treeClearClosures(t.body);
+            }
+        return t;
+        };
     var closure2str = function(cls){
         var ks = scopeKeys(cls || {});
         var res = "";
@@ -880,6 +897,8 @@ var LambdaLang = function(outf){
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
                         // Avoid overwriting closure in tree
+                        // OptiIdeas:
+                        //     clear closure after exec
                         var v0 = treeClone(v);
                         // Apply from old app stack, corresponds to
                         // (\ a . id) a b => id b => b
