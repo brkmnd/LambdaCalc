@@ -3,3 +3,5 @@
 This is an implementation of the simple lambda calculus as described in the book Types and Programming Languages by B. C. Pierce.
 
 The project can be found at http://brkmnd.com/pages/projects/Default.aspx?id=31 - both description and usage.
+
+The constructor of the class is initialized with a function as parameter in which different types of output is formatted. This is described here http://brkmnd.com/pages/projects/Default.aspx?id=36
