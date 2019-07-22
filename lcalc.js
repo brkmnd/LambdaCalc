@@ -941,6 +941,9 @@ var LambdaLang = function(outf){
                 }
             printTree(tree.stmts.args[tree.stmts.args.length - 1]);
             return true;
+            },
+        exec:function(input){
+            return this.evalCallByVal(input);
             }
         };
     };
