@@ -686,12 +686,35 @@ var LambdaLang = function(outf){
         exec(tree);
         return str;
         };
+    var treeClone = function(t){
+        return JSON.parse(JSON.stringify(t));
+        };
+    var treeClearClosures = function(t){
+        switch(t.type){
+            case "abstraction":
+                t.closure = null;
+                return treeClearClosures(t.body);
+            case "apply":
+                return treeClearClosures(t.fun);
+            default:
+                return t;
+            }
+        };
+    var treeClearClosures1 = function(t){
+        if(isAbstr(t)){
+            treeClearClosures(t.body);
+            }
+        return t;
+        };
     var closure2str = function(cls){
         var ks = scopeKeys(cls || {});
         var res = "";
         res += "[";
         for(var i = 0; i < ks.length; i++){
             var key = ks[i];
+            if(key.substring(0,2) === "//"){
+                continue;
+                }
             res += key;
             res += " &#8614; ";
             res += tree2str(cls[key]);
@@ -743,9 +766,6 @@ var LambdaLang = function(outf){
         scope[d][id] = v;
         return true;
         };
-    var scopeCopy = function(s){
-        return s.slice();
-        };
     var scopeGetIgn = function(s,v){
         if(!isVar(v)){
             return v;
@@ -784,11 +804,46 @@ var LambdaLang = function(outf){
     var scopeKeys = function(s){
         return Object.keys(s);
         };
+    var scopeForeach = function(s,f){
+        var ks = scopeKeys(s);
+        for(var i = 0; i < ks.length; i++){
+            var k = ks[i];
+            f(k,s[k]);
+            }
+        };
     var scopeAdd = function(s,id,v){
         s[id] = v;
         };
     var scopeClone = function(s){
         return JSON.parse(JSON.stringify(s));
+        };
+    var scopeCopy = function(s){
+        // Since values are immutabel
+        // closure can be set using shallow copy
+        var retval = {};
+        scopeForeach(s,function(k,v){
+            if(v !== null){
+                retval[k] = v;
+                }
+            });
+        return retval;
+        };
+    var closureCreateFrom = function(s,cid){
+        var c = scopeCopy(s);
+        c["//cid"] = cid;
+        return c;
+        };
+    var scopeUpdate = function(sTarget,sNew){
+        if(sTarget === undefined){
+            return scopeCopy(sNew);
+            }
+        var targetStr = closure2str(sTarget);
+        var newStr = closure2str(sNew);
+        if(targetStr !== newStr){
+            printfn("","tar:"+targetStr);
+            printfn("","new:"+newStr);
+            }
+        return sTarget;
         };
     var treeAppendApps = function(apps,tree){
         // append those apps that are still
@@ -807,6 +862,13 @@ var LambdaLang = function(outf){
         };
     var isVar = function(v){
         return v.type === "var";
+        };
+    var recCounts = {
+        defs:0,
+        term:0,
+        apps:0,
+        vars:0,
+        abstrs:0
         };
     var evalWithStrats = function(stmts){
         // Strict eval of arguments
@@ -827,52 +889,54 @@ var LambdaLang = function(outf){
                 return this.stratVal === "by-name";
                 }
             };
-        var exec = function(depth,scope,apps,t){
+        var ids = {cid:1};
+        var exec = function(depth,scope,apps,t,recCountAdd){
+            recCountAdd(t.type);
             switch(t.type){
                 case "var":
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
+                        // Avoid overwriting closure in tree
+                        // OptiIdeas:
+                        //     clear closure after exec
+                        var v0 = treeClone(v);
                         // Apply from old app stack, corresponds to
                         // (\ a . id) a b => id b => b
-                        return exec(depth+1,v.closure,apps,v);
+                        return exec(depth+1,v0.closure,apps,v0,recCountAdd);
                         }
                     return v;
                 case "abstraction":
                     var topArg = apps.pop();
                     if(topArg === null){
-                        // Returns partial evaluated abstr.
-                        // If closure present, then clone will add
-                        // further bindings to that
-                        t.closure = scopeClone(scope);
+                        // Final return is abstraction
+                        // If closure present, then copy will add
+                        // partial applications to that since that closure
+                        // is passed as scope from start.
+                        t.closure = t.closure || closureCreateFrom(scope,ids.cid++);
                         return t;
                         }
                     var oldScopeVal = function(){
                         // Save current scope val and bind new (shadowing)
                         // thus entering scope
-                        var v = scopeGetNull(scope,t.binder.v);
+                        var v = scopeGetNull(scope,t.binder);
                         scopeAdd(scope,t.binder.v,topArg);
                         return v;
                         }();
-                    var retval = exec(depth+1,scope,apps,t.body);
+                    var retval = exec(depth+1,scope,apps,t.body,recCountAdd);
                     // Overwrite new binding with old val in scope
                     // thus leaving scope level
                     scopeAdd(scope,t.binder.v,oldScopeVal);
                     return retval;
                 case "apply":
+                    var term = t.fun;
                     var arg = function(){
-                        if(strat.isCallByValue()){
-                            // Eval arg with new stack to avoid mix up
-                            // With this strategy eval arg first thing
-                            var apps0 = new Stack();
-                            var retval = exec(depth+1,scope,apps0,t.arg);
-                            retval = treeAppendApps(apps0,retval);
-                            return retval;
-                            }
-                        // Add closure - strategy is unfinished
-                        return t.arg;
+                        // Eval arg with new stack to avoid mix up
+                        var apps0 = new Stack();
+                        var retval = exec(depth+1,scope,apps0,t.arg,recCountAdd);
+                        return treeAppendApps(apps0,retval);
                         }();
                     apps.push(arg);
-                    return exec(depth+1,scope,apps,t.fun);
+                    return exec(depth+1,scope,apps,term,recCountAdd);
                 }
             };
         var startEval = function(){
@@ -884,20 +948,25 @@ var LambdaLang = function(outf){
                 if(stmt.type === "binding"){
                     // Since call-by-val: eval all bindings
                     // before pasted into scope
-                    var term = exec(1,scope,apps,stmt.term);
-                    // closures is added when evaluating
-                    if(isAbstr(term) && term.closure === undefined){
-                        alert("undef closure in eval let");
-                        }
-                    /*
-                    if(isAbstr(term)){
-                        term.closure = term.closure || scopeClone(scope);
-                        }
-                    */
+                    var term = exec(1,scope,apps,stmt.term,function(){ recCounts.defs++; });
+                    // closure is added when evaluating
                     scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
                     continue;
                     }
-                var evaled  = exec(0,scope,apps,stmt);
+                var evaled  = exec(0,scope,apps,stmt,function(t){
+                    recCounts.term++;
+                    switch(t){
+                        case "var":
+                            recCounts.vars++;
+                            break;
+                        case "abstraction":
+                            recCounts.abstrs++;
+                            break;
+                        case "apply":
+                            recCounts.apps++;
+                            break;
+                        }
+                    });
                 var evaledWithArgs = treeAppendApps(apps,evaled);
                 outf("env",closure2str(evaledWithArgs.closure));
                 outf("res",tree2str(evaledWithArgs));
@@ -945,5 +1014,6 @@ var LambdaLang = function(outf){
         exec:function(input){
             return this.evalCallByVal(input);
             }
+        recCounts:recCounts
         };
     };

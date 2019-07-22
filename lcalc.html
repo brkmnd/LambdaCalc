@@ -11,13 +11,53 @@
 <p id="output0"></p>
 <p id="output"></p>
 <span class="prg" id="prg-numerals">// Numerals
-let 0 = \ s . \ z . z;
-let 1 = \ s . \ z . s z;
-let 2 = \ s . \ z . s (s z);
-let 3 = \ s . \ z . s (s (s z));
-let scc = \ n . \ s . \ z . (n s z);
+let id = \ v . v;
+// bools
+let true = \ t . \ f . t;
+let false = \ t . \ f . f;
+// pairs
+let pair = \ f . \ s . \ b . b f s;
+let fst = \ p . p true;
+let snd = \ p . p false;
+
+// num operators
+let isZero = \ m . m (\ x . false) true;
+let scc = \ n . \ s . \ z . s (n s z);
 let plus = \ m . \ n . \ s . \ z . m s (n s z);
-scc 0
+
+// church numerals
+let 0 = (\ s . \ z . z);
+let 1 = (\ s . \ z . s z);
+let 2 = (\ s . \ z . s (s z));
+let 3 = (\ s . \ z . s (s (s z)));
+let 4 = scc 3;
+let 5 = scc 4;
+
+// num operators decs
+let zz = pair 0 0;
+let ss = \ p . pair (snd p) (plus 1 (snd p));
+let prd = \ m0 . fst (m0 ss zz);
+let minus = \ m . \ n . n prd m;
+let times = \ m . \ n . m (plus n) 0;
+
+let test = \ l . \ m . \ n . l m n;
+let equal = \ m . \ n . isZero (minus m n);
+
+
+// recursion
+//let fix =  \ f . (\ x . f (\ y . x x y)) (\ x . f (\ y . x x y));
+//let fixFact = \ fct . \ n . test (equal n 0) 1 (times n (fct (prd n)));
+//let fixSum = \ sum . \ n . test (isZero n) 0 (plus n (sum (prd n)));
+let factorial = fix fixFact;
+let sum = fix fixSum;
+
+// testing
+//test (isZero 0) yes no
+//isZero (prd 1)
+//isZero (plus 3 1)
+//isZero (minus 3 1)
+isZero (times 3 3)
+//test (isZero (prd (prd (prd 3)))) yes no
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
@@ -55,9 +95,9 @@ let fst = \ p . p true;
 let snd = \ p . p false;
 
 // testing
-//fst (pair v w)
+//snd (pair v w)
 test (imp (snd (pair false true)) (snd (pair true false))) if else
-//test (and (snd (pair false true)) (snd (pair true false))) if else
+//test (and (snd (pair false true)) (fst (pair true false))) if else
 </span>
 <span class="prg" id="prg-closures">// Closures
 let id = \ v . v;
@@ -71,11 +111,17 @@ let f1 = \ a . a;
 let closure = (\ a . \ b . \ c . b c) cls1 (\ a . f1);
 closure a
 </span>
+<span class="prg" id="prg-closure2">// Closures 2
+let id = \ v . v;
+let f1 = \ a . a;
+let closure = (\ a . \ b . \ c . b c a) cls1 (\ a . (\ b . b) f1);
+closure a
+</span>
 <!-- Failing Programs -->
 <script src="stack.js"></script>
 <script src="lcalc.js"></script>
 <script>
-    var prgName = "closure1";
+    var prgName = "numerals";
     var printfn = function(){
         var elm = document.getElementById("output");
         elm.style.fontFamily = "monospace";
@@ -119,7 +165,18 @@ closure a
     printfn("","");
     printfn("","----Evaluation Result");
     // Print result
-    llang.evalCallByVal(prg.innerHTML);
+    try {
+        llang.evalCallByVal(prg.innerHTML)
+    } catch(err) {
+        printfn("error","runtime error: "+err.message);
+    }
+    printfn("","");
+    printfn("","recs");
+    printfn("","eval depth [defs]:"+llang.recCounts.defs.toString());
+    printfn("","eval depth [term]:"+llang.recCounts.term.toString());
+    printfn("","eval depth [apps]:"+llang.recCounts.apps.toString());
+    printfn("","eval depth [vars]:"+llang.recCounts.vars.toString());
+    printfn("","eval depth [abstrs]:"+llang.recCounts.abstrs.toString());
 </script>
 </body>
 </html>
