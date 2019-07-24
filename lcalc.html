@@ -56,8 +56,8 @@ let sum = fix fixSum;
 //isZero (prd 1)
 //isZero (plus 3 1)
 //isZero (minus 3 1)
-isZero (times 3 3)
-//test (isZero (prd (prd (prd 3)))) yes no
+//isZero (times 3 3)
+test (isZero (prd (prd (prd 3)))) yes no
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
@@ -166,7 +166,7 @@ closure a
     printfn("","----Evaluation Result");
     // Print result
     try {
-        llang.evalCallByVal(prg.innerHTML)
+        llang.exec(prg.innerHTML)
     } catch(err) {
         printfn("error","runtime error: "+err.message);
     }

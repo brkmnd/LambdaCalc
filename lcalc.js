@@ -1013,7 +1013,7 @@ var LambdaLang = function(outf){
             },
         exec:function(input){
             return this.evalCallByVal(input);
-            }
+            },
         recCounts:recCounts
         };
     };
