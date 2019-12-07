@@ -604,6 +604,57 @@ var LambdaLang = function(outf){
     /* End of parser and generated code
      * Start of print and eval
      * */
+    var assignPtrsToTree = function(tree){
+        // de brunji style variables
+        // Instead of db approach, each binder
+        // has a unique addr. Vars that are free
+        // have a null ptr, the rest have a ptr to
+        // the inner most binder
+        var addr = 1;
+        var ptrs = { /* binder -> addr */ };
+        var travTerm = function(term){
+            switch(term.type){
+                case "abstraction":
+                    // type,binder,body
+                    var b = term.binder.v;
+                    var oldVal = ptrs[b] === undefined ? null : ptrs[b];
+                    ptrs[b] = addr;
+                    term.binder.addr = addr;
+                    addr++;
+                    travTerm(term.body);
+                    ptrs[b] = oldVal;
+                    break;
+                case "apply":
+                    // type,arg,fun
+                    travTerm(term.arg);
+                    travTerm(term.fun);
+                    break;
+                case "var":
+                    var v = term.v;
+                    term.ptr = ptrs[v] || null;
+                    break;
+                default:
+                    // can't happen, or we don't care
+                    break;
+                }
+            };
+        for(var i = 0; i < tree.args.length; i++){
+            var stmt = tree.args[i];
+            switch(stmt.type){
+                case "binding":
+                    // type,id,term
+                    stmt.addr = addr;
+                    addr++;
+                    travTerm(stmt.term);
+                    ptrs[stmt.id] = stmt.addr;
+                    break;
+                default:
+                    travTerm(stmt);
+                    break;
+                }
+            }
+        return tree;
+        };
     var newTree = function(input){
         // Create a new absyn-tree
         // That is the whole process
@@ -618,7 +669,7 @@ var LambdaLang = function(outf){
         if(parsed.count() > 0){
             outf("error","not empty absyn-stack");
             }
-        return {error:false,msg:"",stmts:t};
+        return {error:false,msg:"",stmts:assignPtrsToTree(t)};
         };
     var printSpaces = function(n){
         var retval = "";
@@ -638,16 +689,16 @@ var LambdaLang = function(outf){
         var exec = function(depth,t){
             switch(t.type){
                 case "var":
-                    outf("tnode",printSpaces(depth)+"var."+t.v);
+                    outf("tnode",printSpaces(depth)+"var."+t.v+"["+t.ptr+"]");
                     break;
                 case "abstraction":
-                    outf("tnode",printSpaces(depth)+"&lambda;"+t.binder.v+".");
+                    outf("tnode",printSpaces(depth)+"&lambda;"+t.binder.v+"["+t.binder.addr+"]"+".");
                     exec(depth+1,t.body);
                     break;
                 case "apply":
                     outf("tnode",printSpaces(depth)+"apply");
-                    exec(depth+1,t.arg);
                     exec(depth+1,t.fun);
+                    exec(depth+1,t.arg);
                     break;
                 }
             };
@@ -686,174 +737,48 @@ var LambdaLang = function(outf){
         exec(tree);
         return str;
         };
-    var treeClone = function(t){
-        return JSON.parse(JSON.stringify(t));
-        };
-    var treeClearClosures = function(t){
-        switch(t.type){
-            case "abstraction":
-                t.closure = null;
-                return treeClearClosures(t.body);
-            case "apply":
-                return treeClearClosures(t.fun);
-            default:
-                return t;
-            }
-        };
-    var treeClearClosures1 = function(t){
-        if(isAbstr(t)){
-            treeClearClosures(t.body);
-            }
-        return t;
-        };
-    var closure2str = function(cls){
-        var ks = scopeKeys(cls || {});
-        var res = "";
-        res += "[";
-        for(var i = 0; i < ks.length; i++){
-            var key = ks[i];
-            if(key.substring(0,2) === "//"){
-                continue;
+    var Scope = function(){
+        var pub = {};
+        var nameMap = { /* var-name -> addr */ };
+        var scope = { /* addr -> tree */ };
+        pub.setFromAddr = function(addr,tree){
+            scope[addr] = JSON.stringify(tree);
+            };
+        pub.getFromAddr = function(addr){
+            var v = scope[addr];
+            if(v === undefined || v === null){
+                return null;
                 }
-            res += key;
-            res += " &#8614; ";
-            res += tree2str(cls[key]);
-            res += ", ";
-            }
-        if(ks.length > 0){
-            res = res.substring(0,res.length - 2);
-            }
-        res += "]";
-        return res;
+            return JSON.parse(v);
+            };
+        pub.setFromName = function(vname,addr){
+            nameMap[vname] = addr;
+            };
+        pub.getFromName = function(vname){  
+            return nameMap[vname] || null;
+            };
+        pub.toString = function(closure){
+            return "";
+            };
+        return pub;
         };
-    var scopeSearchUp = function(scope,depth,v){
-        while(depth >= 0){
-            if(scope[depth] !== undefined && scope[depth][v] !== undefined){
-                return depth;
-                }
-            depth--;
-            }
-        return -1;
-        };
-    var scopeSubFirst = function(scope,v){
-        if(!isVar(v)){
-            return v;
-            }
-        for(var i = scope.length - 1; i >= 0; i--){
-            if(scope[i] !== undefined && scope[i][v.v] !== undefined){
-                return scope[i][v.v];
-                }
-            }
-        return v;
-        };
-    var scopePush = function(scope,id,v){
-        if(id === null || v === null){
-            scope.push({});
-            return true;
-            }
-        var level = {};
-        level[id] = v;
-        scope.push(level);
-        return true;
-        };
-    var scopePop = function(scope){ 
-        var retval = scope[scope.length - 1];
-        scope.splice(-1,1);
-        return retval;
-        };
-    var scopeAdd1 = function(scope,id,v){
-        var d = scope.length - 1;
-        scope[d][id] = v;
-        return true;
-        };
-    var scopeGetIgn = function(s,v){
-        if(!isVar(v)){
-            return v;
-            }
-        var id = v.v;
-        if(s[id] !== undefined && s[id] !== null){
-            return s[id];
-            }
-        return v;
-        };
-    var scopeGetNull = function(s,v){
-        if(!isVar(v)){
-            return null;
-            }
-        var id = v.v;
-        if(s[id] !== undefined){
-            return s[id];
-            }
-        return null;
-        };
-    var scopeGet = function(s,v){
-        if(!isVar(v)){
-            return v;
-            }
-        var id = v.v;
-        if(s[id] !== undefined){
-            return s[id];
-            }
-        outf("error","error: id '"+id+"' not present in scope");
-        return null;
-        };
-    var scopeSize = function(s){
-        var k = Object.keys(s);
-        return k.length;
-        };
-    var scopeKeys = function(s){
-        return Object.keys(s);
-        };
-    var scopeForeach = function(s,f){
-        var ks = scopeKeys(s);
-        for(var i = 0; i < ks.length; i++){
-            var k = ks[i];
-            f(k,s[k]);
-            }
-        };
-    var scopeAdd = function(s,id,v){
-        s[id] = v;
-        };
-    var scopeClone = function(s){
-        return JSON.parse(JSON.stringify(s));
-        };
-    var scopeCopy = function(s){
-        // Since values are immutabel
-        // closure can be set using shallow copy
-        var retval = {};
-        scopeForeach(s,function(k,v){
-            if(v !== null){
-                retval[k] = v;
-                }
-            });
-        return retval;
-        };
-    var closureCreateFrom = function(s,cid){
-        var c = scopeCopy(s);
-        c["//cid"] = cid;
-        return c;
-        };
-    var scopeUpdate = function(sTarget,sNew){
-        if(sTarget === undefined){
-            return scopeCopy(sNew);
-            }
-        var targetStr = closure2str(sTarget);
-        var newStr = closure2str(sNew);
-        if(targetStr !== newStr){
-            printfn("","tar:"+targetStr);
-            printfn("","new:"+newStr);
-            }
-        return sTarget;
-        };
-    var treeAppendApps = function(apps,tree){
-        // append those apps that are still
-        // present in apps-stack
-        if(apps.count() === 0){
-            return tree;
-            }
-        var arg = apps.pop();
-        return treeAppendApps(apps,{type:"apply",arg:arg,fun:tree});
-        };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     var isAbstr = function(v){
         return v.type === "abstraction";
         };
@@ -870,6 +795,7 @@ var LambdaLang = function(outf){
         vars:0,
         abstrs:0
         };
+    /*
     var evalWithStrats = function(stmts){
         // Strict eval of arguments
         // Reduce from out to in only as long
@@ -889,30 +815,26 @@ var LambdaLang = function(outf){
                 return this.stratVal === "by-name";
                 }
             };
-        var ids = {cid:1};
-        var exec = function(depth,scope,apps,t,recCountAdd){
+        var exec = function(depth,scope,appStack,t,recCountAdd,closures){
             recCountAdd(t.type);
             switch(t.type){
                 case "var":
                     var v = scopeGetIgn(scope,t);
                     if(isAbstr(v)){
-                        // Avoid overwriting closure in tree
-                        // OptiIdeas:
-                        //     clear closure after exec
-                        var v0 = treeClone(v);
-                        // Apply from old app stack, corresponds to
-                        // (\ a . id) a b => id b => b
-                        return exec(depth+1,v0.closure,apps,v0,recCountAdd);
+                        // Here scope is replaced with closure
+                        // We don't intermix the scope and the closure
+                        var scope0 = closures.get(v.closureId);
+                        return exec(depth+1,scope0,appStack,v,recCountAdd,closures);
                         }
                     return v;
                 case "abstraction":
-                    var topArg = apps.pop();
+                    var topArg = appStack.pop();
                     if(topArg === null){
                         // Final return is abstraction
-                        // If closure present, then copy will add
-                        // partial applications to that since that closure
-                        // is passed as scope from start.
-                        t.closure = t.closure || closureCreateFrom(scope,ids.cid++);
+                        // Each new abstraction is added a new closure
+                        // since old one is not updated on while scope is
+                        t.closureId = closures.create(scope);
+                        // seems like old closures are stored within new ones, probably for each let statement
                         return t;
                         }
                     var oldScopeVal = function(){
@@ -922,7 +844,7 @@ var LambdaLang = function(outf){
                         scopeAdd(scope,t.binder.v,topArg);
                         return v;
                         }();
-                    var retval = exec(depth+1,scope,apps,t.body,recCountAdd);
+                    var retval = exec(depth+1,scope,appStack,t.body,recCountAdd,closures);
                     // Overwrite new binding with old val in scope
                     // thus leaving scope level
                     scopeAdd(scope,t.binder.v,oldScopeVal);
@@ -930,30 +852,43 @@ var LambdaLang = function(outf){
                 case "apply":
                     var term = t.fun;
                     var arg = function(){
+                        // Eval arg first (eager exec) - depth first
                         // Eval arg with new stack to avoid mix up
-                        var apps0 = new Stack();
-                        var retval = exec(depth+1,scope,apps0,t.arg,recCountAdd);
-                        return treeAppendApps(apps0,retval);
+                        var appStack0 = new Stack();
+                        var argVal = exec(depth+1,scope,appStack0,t.arg,recCountAdd,closures);
+                        var retval =  treeAppendApps(appStack0,argVal);
+
+                        if(t.arg.v === "3"){
+                            //alert(tree2str(retval))
+                            //alert(term.v)
+                            }
+
+                        return retval;
                         }();
-                    apps.push(arg);
-                    return exec(depth+1,scope,apps,term,recCountAdd);
+                    appStack.push(arg);
+                    return exec(depth+1,scope,appStack,term,recCountAdd,closures);
                 }
             };
         var startEval = function(){
             // Loop through statements
             var scope = {};
+            var closures = Closures();
             for(var i = 0; i < stmts.length; i++){
                 var stmt = stmts[i];
-                var apps = new Stack();
+                var appStack = new Stack();
                 if(stmt.type === "binding"){
                     // Since call-by-val: eval all bindings
                     // before pasted into scope
-                    var term = exec(1,scope,apps,stmt.term,function(){ recCounts.defs++; });
+                    var term = exec(1,scope,appStack,stmt.term,function(){ recCounts.defs++; },closures);
                     // closure is added when evaluating
-                    scopeAdd(scope,stmt.id,treeAppendApps(apps,term));
+                    if(stmt.id === "4"){
+                        // fix : enter body and substitute
+                        //alert(tree2str(term) + " <- " + tree2str(stmt.term));
+                        }
+                    scopeAdd(scope,stmt.id,treeAppendApps(appStack,term));
                     continue;
                     }
-                var evaled  = exec(0,scope,apps,stmt,function(t){
+                var evaled  = exec(0,scope,appStack,stmt,function(t){
                     recCounts.term++;
                     switch(t){
                         case "var":
@@ -963,43 +898,113 @@ var LambdaLang = function(outf){
                             recCounts.abstrs++;
                             break;
                         case "apply":
-                            recCounts.apps++;
+                            recCounts.appStack++;
                             break;
                         }
-                    });
-                var evaledWithArgs = treeAppendApps(apps,evaled);
-                outf("env",closure2str(evaledWithArgs.closure));
+                    },closures);
+                var evaledWithArgs = treeAppendApps(appStack,evaled);
+                outf("env",closure2str(closures.get(evaledWithArgs.closureId)));
                 outf("res",tree2str(evaledWithArgs));
                 }
             };
+
         return {
             callByValue:function(){
                 strat.setByValue();
                 startEval();
-                },
-            callByName:function(){
-                strat.setByName();
-                startEval();
                 }
             };
         };
+        */
+    var evalAbstr = function(expr,scope){
+        // Sub all vars that are in scope
+        return expr;
+        switch(expr.type){
+            case "abstraction":
+                // type,binder,body
+                var body0 = evalAbstr(expr.body,scope);
+                return {type:expr.type,binder:expr.binder,body:body0};
+            case "apply":
+                // type,arg,fun
+                var fun0 = evalAbstr(expr.fun,scope);
+                var arg0 = evalAbstr(expr.arg,scope);
+                return {type:expr.type,arg:arg0,fun:fun0};
+            case "var":
+                return scope.getFromAddr(expr.ptr) || expr;
+            default:
+                return expr;
+            }
+        };
+    var evalExpr = function(expr,scope,appStack){
+        switch(expr.type){
+            case "apply":
+                // type,arg,fun
+                var l = evalExpr(expr.fun,scope,new Stack());
+                var r = evalExpr(expr.arg,scope,new Stack());
+                appStack.push(r);
+                return evalExpr(l,scope,appStack);
+            case "abstraction":
+                // type,binder,body
+                var topArg = appStack.pop();
+                if(topArg === null){
+                    // Final return is abstr.
+                    // Sub vars that are in scope
+                    return evalAbstr(expr,scope);
+                    }
+                var bName = expr.binder.v;
+                var bAddr = expr.binder.addr;
+                var oldScopeAddr = scope.getFromName(bName);
+                scope.setFromAddr(bAddr,topArg);
+                scope.setFromName(bName,bAddr);
+                var retval = evalExpr(expr.body,scope,appStack);
+                scope.setFromName(bName,oldScopeAddr);
+                return retval;
+            case "var":
+                // Do substitution here
+                // type,v,ptr
+                var res = scope.getFromAddr(expr.ptr);
+                if(res === null){
+                    return expr;
+                    }
+                return evalExpr(res,scope,appStack);
+            default:
+                // we don't care about rest
+                return expr;
+            }
+        };
+    var evalStmts = function(stmts){
+        var scope = new Scope();
+        var res;
+        for(var i = 0; i < stmts.length; i++){
+            var stmt = stmts[i];
+            switch(stmt.type){
+                case "binding":
+                    //type,id,termkey,addr
+                    scope.setFromName(stmt.id,stmt.addr);
+                    scope.setFromAddr(stmt.addr,evalExpr(stmt.term,scope,new Stack()));
+                    break;
+                default:
+                    res = evalExpr(stmt,scope,new Stack());
+                    break;
+                }
+            }
+        printfn("","res:");
+        printfn("",tree2str(res))
+        printfn("","");
+        };
+    var evalTree = function(tree){
+        evalStmts(tree.stmts.args);
+        outf("env","[]");
+        outf("res","none");
+        };
     return {
-        evalCallByVal:function(input){
+        evalPrg:function(input){
             var tree = newTree(input);
             if(tree.error){
                 outf("error",tree.msg);
                 return false;
                 }
-            evalWithStrats(tree.stmts.args).callByValue();
-            return true;
-            },
-        evalCallByName:function(input){
-            var tree = newTree(input);
-            if(tree.error){
-                outf("error",tree.msg);
-                return false;
-                }
-            evalWithStrats(tree.stmts.args).callByName();
+            evalTree(tree);
             return true;
             },
         printTree:function(input){
@@ -1010,9 +1015,6 @@ var LambdaLang = function(outf){
                 }
             printTree(tree.stmts.args[tree.stmts.args.length - 1]);
             return true;
-            },
-        exec:function(input){
-            return this.evalCallByVal(input);
             },
         recCounts:recCounts
         };

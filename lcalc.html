@@ -10,6 +10,10 @@
 <body>
 <p id="output0"></p>
 <p id="output"></p>
+<span class="prg" id="prg-simple1">// Simple #1
+let id = (\ a . a) (\ b . b);
+(\ a . \ b . \ c . a b c) (\ x . \ y . a) id
+</span>
 <span class="prg" id="prg-numerals">// Numerals
 let id = \ v . v;
 // bools
@@ -26,10 +30,10 @@ let scc = \ n . \ s . \ z . s (n s z);
 let plus = \ m . \ n . \ s . \ z . m s (n s z);
 
 // church numerals
-let 0 = (\ s . \ z . z);
-let 1 = (\ s . \ z . s z);
-let 2 = (\ s . \ z . s (s z));
-let 3 = (\ s . \ z . s (s (s z)));
+let 0 = \ s . \ z . z;
+let 1 = \ s . \ z . s z;
+let 2 = \ s . \ z . s (s z);
+let 3 = \ s . \ z . s (s (s z));
 let 4 = scc 3;
 let 5 = scc 4;
 
@@ -57,7 +61,10 @@ let sum = fix fixSum;
 //isZero (plus 3 1)
 //isZero (minus 3 1)
 //isZero (times 3 3)
-test (isZero (prd (prd (prd 3)))) yes no
+//test (isZero (prd (prd (prd 3)))) yes no
+//test (equal (plus 2 1) 1) yes no
+test (equal 2 (minus (scc 3) 2)) yes no
+//scc 3
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;
@@ -121,6 +128,7 @@ closure a
 <script src="stack.js"></script>
 <script src="lcalc.js"></script>
 <script>
+    //var prgName = "simple1";
     var prgName = "numerals";
     var printfn = function(){
         var elm = document.getElementById("output");
@@ -166,7 +174,7 @@ closure a
     printfn("","----Evaluation Result");
     // Print result
     try {
-        llang.exec(prg.innerHTML)
+        llang.evalPrg(prg.innerHTML)
     } catch(err) {
         printfn("error","runtime error: "+err.message);
     }
