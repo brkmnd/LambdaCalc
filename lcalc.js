@@ -706,6 +706,17 @@ var LambdaLang = function(outf){
         };
     var tree2str = function(tree){
         var str = "";
+        var addParsIf = function(cont,check,atype){
+            var l = atype[0];
+            var r = atype[1];
+            if(check){
+                str += l;
+                }
+            cont();
+            if(check){
+                str += r;
+                }
+            };
         var exec = function(t){
             switch(t.type){
                 case "var":
@@ -718,16 +729,11 @@ var LambdaLang = function(outf){
                     exec(t.body);
                     break;
                 case "apply":
-                    var abstr = t.fun.type === "abstraction";
-                    if(abstr){
-                        str += "(";
-                        }
-                    exec(t.fun);
-                    if(abstr){
-                        str += ")";
-                        }
+                    str += "{";
+                    addParsIf(function(){exec(t.fun)},isAbstr(t.fun),"[]");
                     str += " ";
-                    exec(t.arg);
+                    addParsIf(function(){exec(t.arg)},isAbstr(t.arg),"()");
+                    str += "}";
                     break;
                 }
             };
@@ -737,10 +743,25 @@ var LambdaLang = function(outf){
         exec(tree);
         return str;
         };
+    var treeAppendApps = function(apps,tree){
+        // append those apps that are still
+        // present in apps-stack
+        if(apps.count() === 0){
+            return tree;
+            }
+        var arg = apps.pop();
+        return treeAppendApps(apps,{type:"apply",arg:arg,fun:tree});
+        };
     var Scope = function(){
+        // Scope is one big table of addr -> tree
+        // assignPtrsToTree analysis checks whether
+        // scope rules are in order
         var pub = {};
         var nameMap = { /* var-name -> addr */ };
         var scope = { /* addr -> tree */ };
+        pub.existsAddr = function(addr){
+            return scope[addr] !== undefined && scope[addr] !== null;
+            };
         pub.setFromAddr = function(addr,tree){
             scope[addr] = JSON.stringify(tree);
             };
@@ -762,7 +783,6 @@ var LambdaLang = function(outf){
             };
         return pub;
         };
-
 
 
 
@@ -918,31 +938,38 @@ var LambdaLang = function(outf){
         */
     var evalAbstr = function(expr,scope){
         // Sub all vars that are in scope
-        return expr;
-        switch(expr.type){
-            case "abstraction":
-                // type,binder,body
-                var body0 = evalAbstr(expr.body,scope);
-                return {type:expr.type,binder:expr.binder,body:body0};
-            case "apply":
-                // type,arg,fun
-                var fun0 = evalAbstr(expr.fun,scope);
-                var arg0 = evalAbstr(expr.arg,scope);
-                return {type:expr.type,arg:arg0,fun:fun0};
-            case "var":
-                return scope.getFromAddr(expr.ptr) || expr;
-            default:
-                return expr;
+        // Recursively reduce body of abstraction
+        if(isAbstr(expr)){
+            var appStack = new Stack();
+            var retval = {type:expr.type,binder:expr.binder,body:evalExpr(expr.body,scope,appStack)};
+            retval.body = treeAppendApps(appStack,retval.body);
+            return retval;
             }
+        return expr;
         };
     var evalExpr = function(expr,scope,appStack){
         switch(expr.type){
             case "apply":
                 // type,arg,fun
-                var l = evalExpr(expr.fun,scope,new Stack());
-                var r = evalExpr(expr.arg,scope,new Stack());
-                appStack.push(r);
-                return evalExpr(l,scope,appStack);
+                var arg = function(){
+                    // Eval arg first (eager exec) - depth first
+                    // Eval arg with new stack to avoid mix up
+                    var appStack0 = new Stack();
+                    var argVal = evalExpr(expr.arg,scope,appStack0);
+                    var retval = treeAppendApps(appStack0,argVal);
+                    return retval;
+                    }();
+                var body = function(){
+                    // keep on evaluating adding to appStack
+                    appStack.push(arg);
+                    return evalExpr(expr.fun,scope,appStack);
+                    }();
+                if(isVar(body)){
+                    // Final term is var
+                    // Add apps to this
+                    return treeAppendApps(appStack,body);
+                    }
+                return body;
             case "abstraction":
                 // type,binder,body
                 var topArg = appStack.pop();
@@ -954,10 +981,12 @@ var LambdaLang = function(outf){
                 var bName = expr.binder.v;
                 var bAddr = expr.binder.addr;
                 var oldScopeAddr = scope.getFromName(bName);
+                var oldScopeVal = scope.getFromAddr(bAddr);
                 scope.setFromAddr(bAddr,topArg);
                 scope.setFromName(bName,bAddr);
                 var retval = evalExpr(expr.body,scope,appStack);
                 scope.setFromName(bName,oldScopeAddr);
+                scope.setFromAddr(bAddr,oldScopeVal);
                 return retval;
             case "var":
                 // Do substitution here
@@ -966,7 +995,12 @@ var LambdaLang = function(outf){
                 if(res === null){
                     return expr;
                     }
-                return evalExpr(res,scope,appStack);
+                if(isAbstr(res)){
+                    // Keep on evaluating the abstraction
+                    // Use empty scope
+                    return evalExpr(res,new Scope(),appStack);
+                    }
+                return res;
             default:
                 // we don't care about rest
                 return expr;
