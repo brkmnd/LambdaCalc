@@ -50,22 +50,27 @@ let equal = \ m . \ n . isZero (minus m n);
 
 
 // recursion
-//let fix =  \ f . (\ x . f (\ y . x x y)) (\ x . f (\ y . x x y));
+//let fix = \ f . (\ x . f (\ y . x x y)) (\ x . f (\ y . x x y));
 //let fixFact = \ fct . \ n . test (equal n 0) 1 (times n (fct (prd n)));
 //let fixSum = \ sum . \ n . test (isZero n) 0 (plus n (sum (prd n)));
-let factorial = fix fixFact;
-let sum = fix fixSum;
+//let factorial = fix fixFact;
+//let sum = fix fixSum;
 
 // testing
-//test (isZero 0) yes no
+//scc 1
+//scc 2
+//scc 3
+//scc (scc (scc 1))
+//prd 3
+//prd 4
+//prd (prd (prd 4))
 //isZero (prd 1)
 //isZero (plus 3 1)
 //isZero (minus 3 1)
-//isZero (times 3 3)
+//isZero (times 3 0)
 //test (isZero (prd (prd (prd 3)))) yes no
 //test (equal (plus 2 1) 1) yes no
 test (equal 5 (minus (scc 5) 1)) yes no
-//scc 3
 </span>
 <span class="prg" id="prg-logic">// Logic
 let id = \ v . v;

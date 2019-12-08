@@ -609,7 +609,13 @@ var LambdaLang = function(outf){
         // Instead of db approach, each binder
         // has a unique addr. Vars that are free
         // have a null ptr, the rest have a ptr to
-        // the inner most binder
+        // the inner most binder. We can do this since
+        // scope and closures are static. Note that
+        // though the ptr is constant, the value behind
+        // can change, eg. between
+        // (\ s . s) a
+        // and
+        // (\ s . s) b
         var addr = 1;
         var ptrs = { /* binder -> addr */ };
         var travTerm = function(term){
@@ -783,22 +789,7 @@ var LambdaLang = function(outf){
             };
         return pub;
         };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    // Predicate helper functions
     var isAbstr = function(v){
         return v.type === "abstraction";
         };
@@ -815,135 +806,18 @@ var LambdaLang = function(outf){
         vars:0,
         abstrs:0
         };
-    /*
-    var evalWithStrats = function(stmts){
-        // Strict eval of arguments
-        // Reduce from out to in only as long
-        // as outer functions can be reduced
-        var strat = {
-            stratVal:"by-val",
-            setByValue:function(){
-                this.stratVal = "by-val";
-                },
-            setByName:function(){
-                this.stratVal = "by-name";
-                },
-            isCallByValue:function(){
-                return this.stratVal !== "by-name";
-                },
-            isCallByName:function(){
-                return this.stratVal === "by-name";
-                }
-            };
-        var exec = function(depth,scope,appStack,t,recCountAdd,closures){
-            recCountAdd(t.type);
-            switch(t.type){
-                case "var":
-                    var v = scopeGetIgn(scope,t);
-                    if(isAbstr(v)){
-                        // Here scope is replaced with closure
-                        // We don't intermix the scope and the closure
-                        var scope0 = closures.get(v.closureId);
-                        return exec(depth+1,scope0,appStack,v,recCountAdd,closures);
-                        }
-                    return v;
-                case "abstraction":
-                    var topArg = appStack.pop();
-                    if(topArg === null){
-                        // Final return is abstraction
-                        // Each new abstraction is added a new closure
-                        // since old one is not updated on while scope is
-                        t.closureId = closures.create(scope);
-                        // seems like old closures are stored within new ones, probably for each let statement
-                        return t;
-                        }
-                    var oldScopeVal = function(){
-                        // Save current scope val and bind new (shadowing)
-                        // thus entering scope
-                        var v = scopeGetNull(scope,t.binder);
-                        scopeAdd(scope,t.binder.v,topArg);
-                        return v;
-                        }();
-                    var retval = exec(depth+1,scope,appStack,t.body,recCountAdd,closures);
-                    // Overwrite new binding with old val in scope
-                    // thus leaving scope level
-                    scopeAdd(scope,t.binder.v,oldScopeVal);
-                    return retval;
-                case "apply":
-                    var term = t.fun;
-                    var arg = function(){
-                        // Eval arg first (eager exec) - depth first
-                        // Eval arg with new stack to avoid mix up
-                        var appStack0 = new Stack();
-                        var argVal = exec(depth+1,scope,appStack0,t.arg,recCountAdd,closures);
-                        var retval =  treeAppendApps(appStack0,argVal);
-
-                        if(t.arg.v === "3"){
-                            //alert(tree2str(retval))
-                            //alert(term.v)
-                            }
-
-                        return retval;
-                        }();
-                    appStack.push(arg);
-                    return exec(depth+1,scope,appStack,term,recCountAdd,closures);
-                }
-            };
-        var startEval = function(){
-            // Loop through statements
-            var scope = {};
-            var closures = Closures();
-            for(var i = 0; i < stmts.length; i++){
-                var stmt = stmts[i];
-                var appStack = new Stack();
-                if(stmt.type === "binding"){
-                    // Since call-by-val: eval all bindings
-                    // before pasted into scope
-                    var term = exec(1,scope,appStack,stmt.term,function(){ recCounts.defs++; },closures);
-                    // closure is added when evaluating
-                    if(stmt.id === "4"){
-                        // fix : enter body and substitute
-                        //alert(tree2str(term) + " <- " + tree2str(stmt.term));
-                        }
-                    scopeAdd(scope,stmt.id,treeAppendApps(appStack,term));
-                    continue;
-                    }
-                var evaled  = exec(0,scope,appStack,stmt,function(t){
-                    recCounts.term++;
-                    switch(t){
-                        case "var":
-                            recCounts.vars++;
-                            break;
-                        case "abstraction":
-                            recCounts.abstrs++;
-                            break;
-                        case "apply":
-                            recCounts.appStack++;
-                            break;
-                        }
-                    },closures);
-                var evaledWithArgs = treeAppendApps(appStack,evaled);
-                outf("env",closure2str(closures.get(evaledWithArgs.closureId)));
-                outf("res",tree2str(evaledWithArgs));
-                }
-            };
-
-        return {
-            callByValue:function(){
-                strat.setByValue();
-                startEval();
-                }
-            };
-        };
-        */
     var evalAbstr = function(expr,scope){
         // Sub all vars that are in scope
         // Recursively reduce body of abstraction
         if(isAbstr(expr)){
             var appStack = new Stack();
-            var retval = {type:expr.type,binder:expr.binder,body:evalExpr(expr.body,scope,appStack)};
-            retval.body = treeAppendApps(appStack,retval.body);
-            return retval;
+            var body = evalExpr(expr.body,scope,appStack);
+            
+            // fix creates infin rec. This might have to do
+            // with eager evaluation in this version of lcalc
+
+            body = treeAppendApps(appStack,body);
+            return {type:expr.type,binder:expr.binder,body:body};
             }
         return expr;
         };
