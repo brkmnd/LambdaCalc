@@ -201,7 +201,16 @@ closure a
             }
         printfn1("----tree:")
         printfn1(ttree.msg);
-        var teval = llang.evalPrg(tcode);
+        var teval = function(){
+            var retval;
+            try { 
+                retval = llang.evalPrg(tcode);
+                }
+            catch(err){
+                retval = {error:true,msg:err};
+                }
+            return retval;
+            }(); 
         var texpct = document.getElementById(tid+"-expct");
         if(teval.error){
             printfn1(teval.msg,"red");

@@ -763,21 +763,35 @@ var LambdaLang = function(){
         pub.existsAddr = function(addr){
             return scope[addr] !== undefined && scope[addr] !== null;
             };
-        pub.setFromAddrLazy = function(addr,treeFun){
-            scope[addr] = {type:"lazy",fun:treeFun};
+        pub.setFromAddrLazy = function(addr,lazyFun){
+            var f = function(appStack){
+                var res = lazyFun(appStack);
+                // convert to eager after use
+                scope[addr].type = "eager";
+                scope[addr].v = JSON.stringify(res);
+                scope[addr].fun = null;
+                return {type:scope[addr].type,v:res};
+                };
+            scope[addr] = {type:"lazy",fun:f};
             };
         pub.setFromAddr = function(addr,tree){
             scope[addr] = {type:"eager",v:JSON.stringify(tree)};
+            };
+        pub.setFromAddrDirectly = function(addr,v){
+            scope[addr] = v;
             };
         pub.getFromAddr = function(addr){
             var v = scope[addr];
             if(v === undefined || v === null){
                 return null;
                 }
+            var retval = {type:v.type};
             if(v.type === "eager"){
-                return JSON.parse(v.v);
+                retval.v = JSON.parse(v.v);
+                return retval;
                 }
-            return JSON.parse(v.fun());
+            retval.fun = v.fun;
+            return retval;
             };
         pub.setFromName = function(vname,addr){
             nameMap[vname] = addr;
@@ -785,8 +799,31 @@ var LambdaLang = function(){
         pub.getFromName = function(vname){  
             return nameMap[vname] || null;
             };
-        pub.toString = function(closure){
-            return "";
+        pub.copy = function(){
+            // Shallow copy
+            // values can't change, only what pointers point to
+            // so we don't care about copying the values
+            var s = new Scope();
+            var ks = Object.keys(scope);
+            var kn = Object.keys(nameMap);
+            for(var i = 0; i < ks.length; i++){
+                var k = ks[i];
+                var v = scope[k];
+                if(v !== null){
+                    s.setFromAddrDirectly(k,scope[k]);
+                    }
+                }
+            for(var i = 0; i < kn.length; i++){
+                var k = kn[i];
+                var v = nameMap[k];
+                if(v !== null){
+                    s.setFromName(k,v);
+                    }
+                }
+            return s;
+            };
+        pub.countAddrs = function(){
+            return Object.keys(scope).length;
             };
         return pub;
         };
@@ -852,12 +889,13 @@ var LambdaLang = function(){
                 var bName = expr.binder.v;
                 var bAddr = expr.binder.addr;
                 var oldScopeAddr = scope.getFromName(bName);
-                var oldScopeVal = scope.getFromAddr(bAddr);
                 scope.setFromAddr(bAddr,topArg);
                 scope.setFromName(bName,bAddr);
                 var retval = evalExpr(expr.body,scope,appStack);
                 scope.setFromName(bName,oldScopeAddr);
-                scope.setFromAddr(bAddr,oldScopeVal);
+                // we don't care about reinserting old val at addr
+                // scope takes care of not exposing addr when not
+                // reachable
                 return retval;
             case "var":
                 // Do substitution here
@@ -866,6 +904,10 @@ var LambdaLang = function(){
                 if(res === null){
                     return expr;
                     }
+                if(res.type === "lazy"){
+                    res = res.fun(new Stack());
+                    }
+                res = res.v;
                 if(isAbstr(res)){
                     // Keep on evaluating the abstraction
                     // Use empty scope
@@ -886,6 +928,14 @@ var LambdaLang = function(){
                 case "binding":
                     // type,id,termkey,addr
                     // lazy eval bindings in order to not kick start fix
+                    /* not lazy yet
+                    var s0 = scope.copy();
+                    var term = stmt.term;
+                    var lazyFun = function(appStack){
+                        //return evalExpr(term,s0,appStack);
+                        return evalExpr(term,s0,new Stack());
+                        };
+                    */
                     scope.setFromName(stmt.id,stmt.addr);
                     //scope.setFromAddrLazy(stmt.addr,lazyFun);
                     scope.setFromAddr(stmt.addr,evalExpr(stmt.term,scope,new Stack()));
