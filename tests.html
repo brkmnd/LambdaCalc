@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.prg {
+    display:none;
+}
+.expct {
+    display:none;
+}
+</style>
+</head>
+<body>
+<p id="output1"></p>
+<p id="output2"></p>
+<!-- this code is pasted into all tests before the test code -->
+<span id="prelim-precode" style="display:none;">
+let id = \ v . v;
+
+// bools
+let true = \ t . \ f . t;
+let false = \ t . \ f . f;
+let and = \ b . \ c . b c false;
+let or = \ b . \ c . b true c;
+let not = \ b . b false true;
+let imp = \ b . \ c . or (not b) c;
+
+// pairs
+let pair = \ f . \ s . \ b . b f s;
+let fst = \ p . p true;
+let snd = \ p . p false;
+
+// num operators
+let isZero = \ m . m (\ x . false) true;
+let scc = \ n . \ s . \ z . s (n s z);
+let plus = \ m . \ n . \ s . \ z . m s (n s z);
+
+// church numerals
+let 0 = \ s . \ z . z;
+let 1 = \ s . \ z . s z;
+let 2 = \ s . \ z . s (s z);
+let 3 = \ s . \ z . s (s (s z));
+let 4 = scc 3;
+let 5 = scc 4;
+let 6 = scc 6;
+
+// num operators
+let zz = pair 0 0;
+let ss = \ p . pair (snd p) (plus 1 (snd p));
+let prd = \ m0 . fst (m0 ss zz);
+let minus = \ m . \ n . n prd m;
+let times = \ m . \ n . m (plus n) 0;
+
+// conditional statements
+let test = \ l . \ m . \ n . l m n;
+let equal = \ m . \ n . isZero (minus m n);
+
+// recursion
+//fix fires directly because of very eager eval
+//let fix = \ f . (\ x . f (\ y . x x y)) (\ x . f (\ y . x x y));
+//let fixFact = \ fct . \ n . test (equal n 0) 1 (times n (fct (prd n)));
+//let fixSum = \ sum . \ n . test (isZero n) 0 (plus n (sum (prd n)));
+//let factorial = fix fixFact;
+//let sum = fix fixSum;
+</span>
+
+
+<span class="prg" id="test-simple1">
+// Simple #1
+(\ a . \ b . \ c . a b c) (\ x . \ y . a) id
+</span>
+<span class="expct" id="test-simple1-expct">\c. a</span>
+
+
+<span class="prg" id="test-numerals1">
+// Numerals #1
+test (equal 5 (minus (scc 5) 1)) yes no
+</span>
+<span class="expct" id="test-numerals1-expct">yes</span>
+
+
+<span class="prg" id="test-numerals2">
+// Numerals #2
+scc 3
+</span>
+<span class="expct" id="test-numerals2-expct">\s. \z. (s (s (s (s z))))</span>
+
+
+<span class="prg" id="test-numerals3">
+// Numerals #3
+scc (prd (prd 4))
+</span>
+<span class="expct" id="test-numerals3-expct">\s. \z. (s (s (s z)))</span>
+
+
+<span class="prg" id="test-numerals4">
+// Numerals #4
+minus 4 2
+</span>
+<span class="expct" id="test-numerals4-expct">\s. \z. (s (s z))</span>
+
+
+<span class="prg" id="test-logic1">
+// Logic #1
+let log1 = imp true true;
+let log2 = imp false true;
+let log3 = imp true false;
+let log4 = imp false false;
+let log5 = and log1 log2;
+let log6 = and (not log3) log4;
+test (and log5 log6) if else
+</span>
+<span class="expct" id="test-logic1-expct">if</span>
+
+
+<span class="prg" id="test-pairs1">
+// Pairs #1
+// testing
+test (imp (snd (pair false true)) (snd (pair true false))) if else
+</span>
+<span class="expct" id="test-pairs1-expct">else</span>
+
+
+<span class="prg" id="test-closures1">
+// Closures #1
+let closure = (\ a . \ b . \ c . b c) ctest1 ctest2;
+closure a
+</span>
+<span class="expct" id="test-closures1-expct">(ctest2 a)</span>
+
+
+<span class="prg" id="test-closures2">
+// Closure1 #2
+let f1 = \ a . a;
+let closure = (\ a . \ b . \ c . b c) cls1 (\ a . f1);
+closure a
+</span>
+<span class="expct" id="test-closures2-expct">\a. a</span>
+
+
+<span class="prg" id="test-closures3">
+// Closures #3
+let closure = (\ a . \ b . \ c . b c a) cls1 (\ a . (\ b . b) f1);
+closure a
+</span>
+<span class="expct" id="test-closures3-expct">(f1 cls1)</span>
+
+
+<span class="prg" id="test-custom1">
+(times 3 4) one zero
+</span>
+
+
+
+<script src="stack.js"></script>
+<script src="lcalc.js"></script>
+<script>
+    var llang = new LambdaLang(); 
+    var precode = document.getElementById("prelim-precode").innerHTML;
+    var printfn1 = function(){
+        var elm = document.getElementById("output1");
+        elm.style.fontFamily = "monospace";
+        elm.style.fontSize = "12pt";
+        elm.style.whiteSpace = "pre";
+        return function(line,color){
+            if(color !== undefined){
+                elm.innerHTML += "<font color='"+color+"'>"+line+"</font>";
+            } else {
+                elm.innerHTML += line;
+            }
+            elm.innerHTML += "\n";
+            };
+        }();
+    var printfn2 = function(){
+        var elm = document.getElementById("output2");
+        elm.style.fontFamily = "monospace";
+        elm.style.fontSize = "12pt";
+        elm.style.whiteSpace = "pre";
+        return function(line){
+            elm.innerHTML += line;
+            elm.innerHTML += "\n";
+            };
+        }();
+    var printHr1 = function(){
+        var elm = document.getElementById("output1");
+        return function(){
+            elm.innerHTML += "<hr>";
+            };
+        }();
+    var tests = document.getElementsByClassName("prg");
+    for(var i = 0; i < tests.length; i++){
+        var test = tests[i];
+        var tcode = precode + test.innerHTML;
+        var tid = test.id;
+        var ttree = llang.printTree(tcode);
+        printHr1();
+        printfn1(tid,"blue");
+        if(ttree.error){
+            printfn1(ttree.msg,"red");
+            continue;
+            }
+        printfn1("----tree:")
+        printfn1(ttree.msg);
+        var teval = llang.evalPrg(tcode);
+        var texpct = document.getElementById(tid+"-expct");
+        if(teval.error){
+            printfn1(teval.msg,"red");
+            continue;
+            }
+        printfn1("----res:");
+        printfn1(teval.res);
+        if(texpct){
+            var te = texpct.innerHTML.replace(/\\/g,"&lambda;");
+            var tres = te === teval.res ? "<font color='green'>yes</font>" : "<font color='red'>no</font>";
+            printfn1("----expct:");
+            printfn1(te);
+            printfn1("#match: " + tres);
+            }
+        }
+    // Print the parsing tree
+</script>
+</body>
+</html>

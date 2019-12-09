@@ -1,4 +1,4 @@
-var LambdaLang = function(outf){
+var LambdaLang = function(){
     var actionType = {
         shift:function(d){
             return {type:"shift",v:d};
@@ -673,7 +673,7 @@ var LambdaLang = function(outf){
             return {error:true,msg:t.msg,stmts:null};
             }
         if(parsed.count() > 0){
-            outf("error","not empty absyn-stack");
+            return {error:true,msg:"not empty absyn-stack",stmts:null};
             }
         return {error:false,msg:"",stmts:assignPtrsToTree(t)};
         };
@@ -684,31 +684,26 @@ var LambdaLang = function(outf){
             }
         return retval;
         };
-    var printLexed = function(l){
-        var i = 0;
-        while(l[i] !== undefined){
-            outf("token",l[i].tt);
-            i++;
-            }
-        };
     var printTree = function(t0){
+        var retval = "";
         var exec = function(depth,t){
             switch(t.type){
                 case "var":
-                    outf("tnode",printSpaces(depth)+"var."+t.v+"["+t.ptr+"]");
+                    retval += printSpaces(depth)+"var."+t.v+"["+t.ptr+"]\n";
                     break;
                 case "abstraction":
-                    outf("tnode",printSpaces(depth)+"&lambda;"+t.binder.v+"["+t.binder.addr+"]"+".");
+                    retval += printSpaces(depth)+"&lambda;"+t.binder.v+"["+t.binder.addr+"]\n";
                     exec(depth+1,t.body);
                     break;
                 case "apply":
-                    outf("tnode",printSpaces(depth)+"apply");
+                    retval += printSpaces(depth)+"apply\n";
                     exec(depth+1,t.fun);
                     exec(depth+1,t.arg);
                     break;
                 }
             };
         exec(0,t0);
+        return retval;
         };
     var tree2str = function(tree){
         var str = "";
@@ -735,11 +730,11 @@ var LambdaLang = function(outf){
                     exec(t.body);
                     break;
                 case "apply":
-                    str += "{";
-                    addParsIf(function(){exec(t.fun)},isAbstr(t.fun),"[]");
+                    str += "(";
+                    addParsIf(function(){exec(t.fun)},isAbstr(t.fun),"{}");
                     str += " ";
-                    addParsIf(function(){exec(t.arg)},isAbstr(t.arg),"()");
-                    str += "}";
+                    addParsIf(function(){exec(t.arg)},isAbstr(t.arg),"{}");
+                    str += ")";
                     break;
                 }
             };
@@ -768,15 +763,21 @@ var LambdaLang = function(outf){
         pub.existsAddr = function(addr){
             return scope[addr] !== undefined && scope[addr] !== null;
             };
+        pub.setFromAddrLazy = function(addr,treeFun){
+            scope[addr] = {type:"lazy",fun:treeFun};
+            };
         pub.setFromAddr = function(addr,tree){
-            scope[addr] = JSON.stringify(tree);
+            scope[addr] = {type:"eager",v:JSON.stringify(tree)};
             };
         pub.getFromAddr = function(addr){
             var v = scope[addr];
             if(v === undefined || v === null){
                 return null;
                 }
-            return JSON.parse(v);
+            if(v.type === "eager"){
+                return JSON.parse(v.v);
+                }
+            return JSON.parse(v.fun());
             };
         pub.setFromName = function(vname,addr){
             nameMap[vname] = addr;
@@ -812,10 +813,6 @@ var LambdaLang = function(outf){
         if(isAbstr(expr)){
             var appStack = new Stack();
             var body = evalExpr(expr.body,scope,appStack);
-            
-            // fix creates infin rec. This might have to do
-            // with eager evaluation in this version of lcalc
-
             body = treeAppendApps(appStack,body);
             return {type:expr.type,binder:expr.binder,body:body};
             }
@@ -887,8 +884,10 @@ var LambdaLang = function(outf){
             var stmt = stmts[i];
             switch(stmt.type){
                 case "binding":
-                    //type,id,termkey,addr
+                    // type,id,termkey,addr
+                    // lazy eval bindings in order to not kick start fix
                     scope.setFromName(stmt.id,stmt.addr);
+                    //scope.setFromAddrLazy(stmt.addr,lazyFun);
                     scope.setFromAddr(stmt.addr,evalExpr(stmt.term,scope,new Stack()));
                     break;
                 default:
@@ -896,33 +895,27 @@ var LambdaLang = function(outf){
                     break;
                 }
             }
-        printfn("","res:");
-        printfn("",tree2str(res))
-        printfn("","");
+        return tree2str(res);
         };
     var evalTree = function(tree){
-        evalStmts(tree.stmts.args);
-        outf("env","[]");
-        outf("res","none");
+        return evalStmts(tree.stmts.args);
         };
     return {
         evalPrg:function(input){
             var tree = newTree(input);
             if(tree.error){
-                outf("error",tree.msg);
-                return false;
+                return {error:true,msg:tree.msg};
                 }
-            evalTree(tree);
-            return true;
+            var res = evalTree(tree);
+            return {error:false,res:res};
             },
         printTree:function(input){
             var tree = newTree(input);
             if(tree.error){
-                outf("error",tree.msg);
-                return false;
+                return {error:true,msg:tree.msg};
                 }
-            printTree(tree.stmts.args[tree.stmts.args.length - 1]);
-            return true;
+            var res = printTree(tree.stmts.args[tree.stmts.args.length - 1]);
+            return {error:false,msg:res};
             },
         recCounts:recCounts
         };
