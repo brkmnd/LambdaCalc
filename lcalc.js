@@ -127,7 +127,7 @@ var LambdaLang = function(){
         var rx = new RegExp(rxStr,"g");
         var retI = 0;
         var retval = {};
-        var linepos = {lnr:1,start:0};
+        var linepos = {lnr:1,start:0,x:0};
         var resStr = inStr.replace(rx,
             function(a,i1,i2,i3,i4,i5,i6,i7,i8,posX){
                 linepos.x = posX;

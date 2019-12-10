@@ -131,7 +131,13 @@ let equal = \ m . \ n . isZero (minus m n);
             }
         printfn1("----tree:")
         printfn1(tree.msg);
-        var teval = llang.evalPrg(code);
+        var teval = null;
+        try {
+            teval = llang.evalPrg(code);
+            }
+        catch(err){
+            teval = {error:true,msg:err};
+            }
         if(teval.error){
             printfn1(teval.msg,"red");
             return false;
